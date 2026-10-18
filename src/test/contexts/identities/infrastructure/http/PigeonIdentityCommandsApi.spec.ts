@@ -6,6 +6,7 @@ import {
   RecoveryKey,
   Signature,
   SymmetricKey,
+  ProofOfWork,
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -25,7 +26,6 @@ import { IdentityId } from '../../../../../contexts/identities/domain/value-obje
 import { IdentityMasterKeyProtection } from '../../../../../contexts/identities/domain/value-objects/IdentityMasterKeyProtection';
 import { IdentityNetworkMemberships } from '../../../../../contexts/identities/domain/value-objects/IdentityNetworkMemberships';
 import { IdentityRegistrationCode } from '../../../../../contexts/identities/domain/value-objects/IdentityRegistrationCode';
-import { IdentityAdmissionProof } from '../../../../../contexts/identities/infrastructure/crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
@@ -254,9 +254,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
 
     expect(http.request).toHaveBeenCalledTimes(2);
     expect(
-      IdentityAdmissionProof.isValid(
-        retried.id,
-        retried.networks,
+      ProofOfWork.identityAdmission(retried.id, retried.networks).verify(
         retried.admissionNonce,
         17,
       ),
@@ -305,9 +303,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
 
     expect(sentBody(http, 0).admissionNonce).toBe('0');
     expect(
-      IdentityAdmissionProof.isValid(
-        retried.id,
-        retried.networks,
+      ProofOfWork.identityAdmission(retried.id, retried.networks).verify(
         retried.admissionNonce,
         17,
       ),
@@ -315,7 +311,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
   });
 
   it('gives up after two re-mined retries', async () => {
-    jest.spyOn(IdentityAdmissionProof, 'mine').mockResolvedValue('1');
+    jest.spyOn(ProofOfWork.prototype, 'mint').mockResolvedValue('1');
     const refusal = busy(19);
     const http = {
       request: jest
@@ -340,7 +336,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
   });
 
   it('does not mine above 24 bits', async () => {
-    const mine = jest.spyOn(IdentityAdmissionProof, 'mine');
+    const mine = jest.spyOn(ProofOfWork.prototype, 'mint');
     const refusal = busy(25);
     const http = {
       request: jest.fn().mockRejectedValueOnce(refusal),

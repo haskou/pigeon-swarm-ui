@@ -1,6 +1,7 @@
+import { ProofOfWork } from '@haskou/pigeon-swarm-crypto';
+
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 
-import { IdentityAdmissionProof } from '../../../../../contexts/identities/infrastructure/crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 
 describe(IdentitySignaturePayloadFactory.name, () => {
@@ -236,10 +237,9 @@ describe(IdentitySignaturePayloadFactory.name, () => {
 
       expect(payload.admissionNonce).not.toBe('carried-over');
       expect(
-        IdentityAdmissionProof.isValid(
-          'identity-1',
-          payload.networks,
+        ProofOfWork.identityAdmission('identity-1', payload.networks).verify(
           payload.admissionNonce,
+          16,
         ),
       ).toBe(true);
     });

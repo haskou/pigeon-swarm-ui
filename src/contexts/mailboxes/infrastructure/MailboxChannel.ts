@@ -15,8 +15,8 @@ import type {
 
 import { encodeBase64Url } from '../../../shared/infrastructure/encoding/base64url';
 import { MailboxUnavailableError } from '../domain/errors/MailboxUnavailableError';
+import { MailboxCreationDifficultyPolicy } from '../domain/MailboxCreationDifficultyPolicy';
 import { MailboxCreationDomainService } from '../domain/services/MailboxCreationDomainService';
-import { MailboxCreationProof } from './crypto/MailboxCreationProof';
 
 export type MailboxCreationMiner = (
   mailboxId: string,
@@ -179,7 +179,7 @@ export class MailboxChannel {
             difficultyBits,
           ),
       },
-      MailboxCreationProof.DEFAULT_DIFFICULTY_BITS,
+      MailboxCreationDifficultyPolicy.DEFAULT_DIFFICULTY_BITS,
     );
   }
 

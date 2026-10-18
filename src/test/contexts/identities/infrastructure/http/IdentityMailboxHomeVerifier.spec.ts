@@ -47,7 +47,7 @@ async function fixture(mailboxHome?: string) {
       new PublicKey(deviceCredential),
     ),
     id,
-    networks: [],
+    networks: ['network-1'],
     profile: { name: 'Ada' },
     recoveryAuthority: (await KeyPair.generate()).toPrimitives().publicKey,
     timestamp: 1,

@@ -30,7 +30,6 @@ import { requiredDifficultyBits } from '../../../../shared/infrastructure/http/r
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityAdmissionDifficultyPolicy } from '../../domain/IdentityAdmissionDifficultyPolicy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
-import { IdentityAdmissionProof } from '../crypto/IdentityAdmissionProof';
 import { IdentitySignaturePayloadFactory } from './IdentitySignaturePayloadFactory';
 
 const REGISTRATION_CODE_HEADER = 'X-Registration-Code';
@@ -71,7 +70,7 @@ export class PigeonIdentityCommandsApi {
         if (
           requiredBits === undefined ||
           !IdentityAdmissionDifficultyPolicy.allowsRetry(
-            IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS,
+            IdentityAdmissionDifficultyPolicy.DEFAULT_DIFFICULTY_BITS,
             requiredBits,
             retry,
           )

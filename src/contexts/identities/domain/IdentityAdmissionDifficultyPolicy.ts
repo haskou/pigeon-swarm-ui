@@ -4,6 +4,8 @@
  * `maximumRetries` times, only above the default and within its ceiling.
  */
 export class IdentityAdmissionDifficultyPolicy {
+  /** The protocol minimum a node accepts without naming a higher difficulty. */
+  public static readonly DEFAULT_DIFFICULTY_BITS = 16;
   private static readonly maximumBits = 24;
   public static readonly maximumRetries = 2;
 
