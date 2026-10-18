@@ -4,6 +4,8 @@ import type { NodePeersSnapshot } from './NodePeersSnapshot';
 import type { NetworkPeerResource } from './resources/NetworkPeerResource';
 import type { NetworkResource } from './resources/NetworkResource';
 
+import { readNodePeersSnapshot } from './readNodePeersSnapshot';
+
 export class NodeBootstrapApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
@@ -51,13 +53,6 @@ export class NodeBootstrapApi {
   }
 
   public async getPeerSnapshot(): Promise<NodePeersSnapshot> {
-    const result =
-      await this.http.request<Partial<NodePeersSnapshot>>('/peers');
-
-    return {
-      ipfsPeers: result.ipfsPeers ?? [],
-      networkSynchronization: result.networkSynchronization ?? null,
-      peers: result.peers ?? [],
-    };
+    return await readNodePeersSnapshot(this.http);
   }
 }

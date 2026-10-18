@@ -8,6 +8,8 @@ import type { NetworkPeerResource } from './resources/NetworkPeerResource';
 import type { NetworkResource } from './resources/NetworkResource';
 import type { NodeRelayConfigurationResource } from './resources/NodeRelayConfigurationResource';
 
+import { readNodePeersSnapshot } from './readNodePeersSnapshot';
+
 export class PigeonNodeApi {
   private readonly requestCache = new Map<string, Promise<unknown>>();
 
@@ -118,14 +120,7 @@ export class PigeonNodeApi {
   }
 
   public async getPeerSnapshot(): Promise<NodePeersSnapshot> {
-    const result =
-      await this.http.request<Partial<NodePeersSnapshot>>('/peers');
-
-    return {
-      ipfsPeers: result.ipfsPeers ?? [],
-      networkSynchronization: result.networkSynchronization ?? null,
-      peers: result.peers ?? [],
-    };
+    return await readNodePeersSnapshot(this.http);
   }
 
   public async createNetwork(
