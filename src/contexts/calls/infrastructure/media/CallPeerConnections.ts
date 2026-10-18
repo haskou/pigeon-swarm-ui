@@ -50,7 +50,7 @@ export class CallPeerConnections {
   private readonly peerSignalSenders = new Map<string, SignalSender>();
   private readonly pendingPeerCreations = new Map<
     string,
-    Promise<RTCPeerConnection>
+    Promise<RTCPeerConnection | undefined>
   >();
 
   private readonly remoteStreams = new Map<string, MediaStream>();
@@ -62,6 +62,11 @@ export class CallPeerConnections {
    * refused until a snapshot lists them joined again.
    */
   private readonly spentAnswerHolds = new Set<string>();
+  /**
+   * Counts the resets. A connection whose creation began before a reset is
+   * never built, since the call it served has ended.
+   */
+  private resets = 0;
   private lastRetainedPeerIdentityIds = new Set<string>();
   private stopAnswerRelease: (() => void) | undefined;
 
@@ -99,7 +104,7 @@ export class CallPeerConnections {
   private async createPeer(
     peerIdentityId: string,
     sendSignal: SignalSender,
-  ): Promise<RTCPeerConnection> {
+  ): Promise<RTCPeerConnection | undefined> {
     if (!this.rtcConfigurationProvider) {
       logCallError(
         'peer-manager:create-peer:missing-rtc-configuration',
@@ -109,9 +114,19 @@ export class CallPeerConnections {
       throw new Error('RTCPeerConnection configuration is not loaded.');
     }
 
-    const rtcConfiguration = this.mediaEncryption.peerConfiguration(
-      await this.rtcConfigurationProvider(),
-    );
+    const resets = this.resets;
+    const configuration = await this.rtcConfigurationProvider();
+
+    // A peer released, or a call reset, while its configuration loaded gets
+    // no connection: nothing could release a connection not yet in peers.
+    if (resets !== this.resets || this.spentAnswerHolds.has(peerIdentityId)) {
+      logCallDebug('peer-manager:create-peer:abandoned', { peerIdentityId });
+
+      return undefined;
+    }
+
+    const rtcConfiguration =
+      this.mediaEncryption.peerConfiguration(configuration);
     const peer = new RTCPeerConnection(rtcConfiguration);
 
     this.peerSignalSenders.set(peerIdentityId, sendSignal);
@@ -229,7 +244,7 @@ export class CallPeerConnections {
   private async getOrCreatePeer(
     peerIdentityId: string,
     sendSignal: SignalSender,
-  ): Promise<RTCPeerConnection> {
+  ): Promise<RTCPeerConnection | undefined> {
     const existing = this.peers.get(peerIdentityId);
 
     if (existing) return existing;
@@ -245,7 +260,10 @@ export class CallPeerConnections {
     try {
       return await peerCreation;
     } finally {
-      this.pendingPeerCreations.delete(peerIdentityId);
+      // A reset may have cleared the entry, and a newer creation may own it.
+      if (this.pendingPeerCreations.get(peerIdentityId) === peerCreation) {
+        this.pendingPeerCreations.delete(peerIdentityId);
+      }
     }
   }
 
@@ -523,6 +541,8 @@ export class CallPeerConnections {
     this.negotiation.configureState(peerIdentityId, !shouldOffer);
     const peer = await this.getOrCreatePeer(peerIdentityId, sendSignal);
 
+    if (!peer) return;
+
     await this.negotiation.offerIfNeeded(
       peerIdentityId,
       peer,
@@ -570,6 +590,8 @@ export class CallPeerConnections {
 
     this.peerSignalSenders.set(senderIdentityId, sendSignal);
     const peer = await this.getOrCreatePeer(senderIdentityId, sendSignal);
+
+    if (!peer) return;
 
     if (signalType === 'ice_candidate') {
       await this.iceCandidates.handleSignal(
@@ -620,6 +642,7 @@ export class CallPeerConnections {
     this.peers.clear();
     this.mediaEncryption.reset();
     this.pendingPeerCreations.clear();
+    this.resets += 1;
     this.recovery.reset();
     this.iceCandidates.reset();
     this.negotiation.reset();
@@ -653,6 +676,7 @@ export class CallPeerConnections {
       listed.delete(peerIdentityId);
       this.answeredAt.delete(peerIdentityId);
       this.spentAnswerHolds.add(peerIdentityId);
+      this.peerSignalSenders.delete(peerIdentityId);
     }
 
     for (const peerIdentityId of listed) {
