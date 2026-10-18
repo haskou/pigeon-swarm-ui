@@ -59,6 +59,26 @@ export interface PendingNodeBlockEntriesResource {
   version: number | null;
 }
 
+export interface NodeBlockSourcesPageResource {
+  nextCursor: string | null;
+  sources: NodeBlockSourceResource[];
+}
+
+export interface NodeRegistrationCodesPageResource {
+  codes: NodeRegistrationCodeResource[];
+  nextCursor: string | null;
+}
+
+/** One page of pending entries; each array pages on its own cursor. */
+export interface PendingNodeBlockEntriesPageResource {
+  blockedIdentityIds: string[];
+  blockedIdentityIdsNextCursor: string | null;
+  blockedNodePeerIds: string[];
+  blockedNodePeerIdsNextCursor: string | null;
+  ownerIdentityId: string;
+  version: number | null;
+}
+
 export interface NodeBlockApprovalResource {
   all: boolean;
   blockedIdentityIds?: string[];

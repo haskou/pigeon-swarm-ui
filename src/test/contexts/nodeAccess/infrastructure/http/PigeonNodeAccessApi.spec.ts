@@ -67,4 +67,72 @@ describe(PigeonNodeAccessApi.name, () => {
 
     expect(signer.headers).toHaveBeenCalledTimes(2);
   });
+
+  it('pages each pending array with its own cursor', async () => {
+    const { api, http } = apiWith();
+    const page = {
+      blockedIdentityIds: [],
+      blockedIdentityIdsNextCursor: null,
+      blockedNodePeerIds: [],
+      blockedNodePeerIdsNextCursor: null,
+      ownerIdentityId: 'T3duZXJLZXk=',
+      version: 3,
+    };
+
+    http.request.mockImplementation((path: string) => {
+      const query = new URL(path, 'https://node.test').searchParams;
+
+      if (query.has('blockedIdentityIdsLimit')) {
+        return Promise.resolve(
+          query.has('blockedIdentityIdsCursor')
+            ? { ...page, blockedIdentityIds: ['bob'] }
+            : {
+                ...page,
+                blockedIdentityIds: ['alice'],
+                blockedIdentityIdsNextCursor: 'identity-2',
+              },
+        );
+      }
+
+      return Promise.resolve({ ...page, blockedNodePeerIds: ['peer-1'] });
+    });
+
+    await expect(
+      api.getPendingEntries('T3duZXJLZXk=', {} as Session),
+    ).resolves.toEqual({
+      blockedIdentityIds: ['alice', 'bob'],
+      blockedNodePeerIds: ['peer-1'],
+      ownerIdentityId: 'T3duZXJLZXk=',
+      version: 3,
+    });
+    expect(http.request.mock.calls.map(([path]) => path)).toEqual([
+      '/node/block-sources/T3duZXJLZXk%3D/pending-entries?blockedIdentityIdsLimit=100',
+      '/node/block-sources/T3duZXJLZXk%3D/pending-entries?blockedIdentityIdsLimit=100&blockedIdentityIdsCursor=identity-2',
+      '/node/block-sources/T3duZXJLZXk%3D/pending-entries?blockedNodePeerIdsLimit=100',
+    ]);
+  });
+
+  it('follows block source pages until the node reports no next cursor', async () => {
+    const { api, http } = apiWith();
+
+    http.request.mockImplementation((path: string) =>
+      Promise.resolve(
+        new URL(path, 'https://node.test').searchParams.has('cursor')
+          ? { nextCursor: null, sources: [{ ownerIdentityId: 'bob' }] }
+          : {
+              nextCursor: 'sources-2',
+              sources: [{ ownerIdentityId: 'alice' }],
+            },
+      ),
+    );
+
+    await expect(api.getSources({} as Session)).resolves.toEqual([
+      { ownerIdentityId: 'alice' },
+      { ownerIdentityId: 'bob' },
+    ]);
+    expect(http.request.mock.calls.map(([path]) => path)).toEqual([
+      '/node/block-sources?limit=100',
+      '/node/block-sources?limit=100&cursor=sources-2',
+    ]);
+  });
 });

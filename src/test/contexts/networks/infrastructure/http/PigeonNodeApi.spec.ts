@@ -75,21 +75,31 @@ describe(PigeonNodeApi.name, () => {
       nodeType: 'unknown',
       owner: 'MCowBQYDK2VwAyEAbeVjQTYZphL/OY5i6+sXvl6h/DC0GLqa1H1hQD+ctbI=',
     };
-    const request = jest
-      .fn()
-      .mockResolvedValueOnce({ peers: [] })
-      .mockResolvedValueOnce({ peers: [peer] });
+    let peers: unknown[] = [];
+    const request = jest.fn((path: string) => {
+      const query = new URL(path, 'https://node.test').searchParams;
+
+      return query.has('peersLimit')
+        ? { peers, peersNextCursor: null }
+        : { ipfsPeers: [], ipfsPeersNextCursor: null };
+    });
     const api = new PigeonNodeApi(
       { request } as unknown as HttpJsonClient,
       {} as RequestSigner,
     );
 
     await expect(api.getPeers()).resolves.toEqual([]);
+
+    peers = [peer];
+
     await expect(api.getPeers()).resolves.toEqual([peer]);
 
-    expect(request).toHaveBeenCalledTimes(2);
-    expect(request).toHaveBeenNthCalledWith(1, '/peers');
-    expect(request).toHaveBeenNthCalledWith(2, '/peers');
+    expect(request.mock.calls.map(([path]) => path)).toEqual([
+      '/peers?peersLimit=100',
+      '/peers?ipfsPeersLimit=100',
+      '/peers?peersLimit=100',
+      '/peers?ipfsPeersLimit=100',
+    ]);
   });
 
   it('loads relay configuration with an owner-signed request', async () => {
