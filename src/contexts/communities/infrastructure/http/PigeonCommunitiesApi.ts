@@ -563,13 +563,12 @@ export class PigeonCommunitiesApi {
 
     if (input.cursor) query.set('cursor', input.cursor);
 
-    return await this.http.request<CommunityModerationLogPage>(
-      `${path}${query.size > 0 ? `?${query.toString()}` : ''}`,
-      {
-        headers: await this.signer.headers(session, 'GET', path),
-        method: 'GET',
-      },
-    );
+    const target = `${path}${query.size > 0 ? `?${query.toString()}` : ''}`;
+
+    return await this.http.request<CommunityModerationLogPage>(target, {
+      headers: await this.signer.headers(session, 'GET', target),
+      method: 'GET',
+    });
   }
 
   public async discover(
@@ -596,7 +595,7 @@ export class PigeonCommunitiesApi {
         communities: CommunityDiscoveryResource[];
         nextCursor: string | null;
       }>(target, {
-        headers: await this.signer.headers(session, 'GET', path, body),
+        headers: await this.signer.headers(session, 'GET', target, body),
         method: 'GET',
       });
     });
@@ -1445,10 +1444,12 @@ export class PigeonCommunitiesApi {
     const query = new URLSearchParams({
       limit: String(options.limit ?? 50),
     });
+
+    const target = `${path}?${query.toString()}`;
     const result = await this.http.request<{
       messages?: MessageResource[];
-    }>(`${path}?${query.toString()}`, {
-      headers: await this.signer.headers(session, 'GET', path),
+    }>(target, {
+      headers: await this.signer.headers(session, 'GET', target),
       method: 'GET',
     });
 
@@ -1610,10 +1611,13 @@ export class PigeonCommunitiesApi {
       limit: String(input.limit ?? 20),
       query: input.query,
     });
+
+    const target = `${path}?${query.toString()}`;
+
     const result = await this.http.request<CommunityChannelMessageSearchResult>(
-      `${path}?${query.toString()}`,
+      target,
       {
-        headers: await this.signer.headers(session, 'GET', path),
+        headers: await this.signer.headers(session, 'GET', target),
         method: 'GET',
       },
     );
@@ -1635,10 +1639,12 @@ export class PigeonCommunitiesApi {
       query: input.query,
     });
 
+    const target = `${path}?${query.toString()}`;
+
     return await this.http.request<CommunityChannelMessageSearchResult>(
-      `${path}?${query.toString()}`,
+      target,
       {
-        headers: await this.signer.headers(session, 'GET', path),
+        headers: await this.signer.headers(session, 'GET', target),
         method: 'GET',
       },
     );

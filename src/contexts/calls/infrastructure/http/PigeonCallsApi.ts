@@ -86,8 +86,10 @@ export class PigeonCallsApi {
   public async list(session: Session): Promise<CallResource[]> {
     const path = '/calls';
     const pages = await readAllPages<CallsResource>(async (cursor) => {
-      return await this.http.request<CallsResource>(pagedPath(path, cursor), {
-        headers: await this.signer.headers(session, 'GET', path),
+      const target = pagedPath(path, cursor);
+
+      return await this.http.request<CallsResource>(target, {
+        headers: await this.signer.headers(session, 'GET', target),
         method: 'GET',
       });
     });

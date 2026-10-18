@@ -18,13 +18,12 @@ export class PigeonConversationsApi {
   public async list(session: Session): Promise<ConversationResource[]> {
     const path = '/conversations';
     const pages = await readAllPages<ConversationsResource>(async (cursor) => {
-      return await this.http.request<ConversationsResource>(
-        pagedPath(path, cursor),
-        {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        },
-      );
+      const target = pagedPath(path, cursor);
+
+      return await this.http.request<ConversationsResource>(target, {
+        headers: await this.signer.headers(session, 'GET', target),
+        method: 'GET',
+      });
     });
 
     return pages.flatMap((page) => this.mapper.list(page));
