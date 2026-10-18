@@ -2916,6 +2916,32 @@ describe(CallPeerConnections.name, () => {
 
       expect(peers).toHaveLength(1);
     });
+
+    it('creates no connection for a peer that an explicit status releases while its configuration loads', async () => {
+      let loadConfiguration: () => void = () => undefined;
+      const configuration = new Promise<{ iceServers: [] }>((resolve) => {
+        loadConfiguration = () => resolve({ iceServers: [] });
+      });
+
+      manager.configure(() => configuration);
+      manager.setLocalStream(
+        mediaStreamWithTracks([mediaTrack('microphone', 'audio')]),
+      );
+      const answering = manager.handleSignal(
+        'bob',
+        'offer',
+        { sdp: 'bob-offer-sdp', type: 'offer' },
+        sendSignal,
+        'alice',
+      );
+
+      manager.retainPeers(new Set(), new Set(['bob']));
+      loadConfiguration();
+      await answering;
+
+      expect(peers).toHaveLength(0);
+      expect(sendSignal).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps its cipher when handed a call key it cannot read', () => {
