@@ -269,4 +269,77 @@ describe(PigeonStickersApi.name, () => {
       });
     });
   });
+
+  describe('paged reads', () => {
+    const apiWith = (request: jest.Mock, signer = mock<RequestSigner>()) =>
+      new PigeonStickersApi(
+        { request } as unknown as HttpJsonClient,
+        signer,
+        publicMutationSignerAt(),
+        mock<PigeonPublicFilesClient>(),
+        { prepare: jest.fn() },
+      );
+
+    it('reads every page of sticker packs', async () => {
+      const request = jest
+        .fn()
+        .mockResolvedValueOnce({
+          nextCursor: 'next-1',
+          results: [{ id: 'pack-1' }],
+        })
+        .mockResolvedValueOnce({
+          nextCursor: null,
+          results: [{ id: 'pack-2' }],
+        });
+
+      await expect(
+        apiWith(request).listPacks({ ownerIdentityId: 'identity-1' }),
+      ).resolves.toEqual([{ id: 'pack-1' }, { id: 'pack-2' }]);
+      expect(request.mock.calls.map((call: unknown[]) => call[0])).toEqual([
+        '/stickers/packs?ownerIdentityId=identity-1&limit=100',
+        '/stickers/packs?ownerIdentityId=identity-1&limit=100&cursor=next-1',
+      ]);
+    });
+
+    it('reads saved packs and favorite stickers each through its own cursor', async () => {
+      const request = jest.fn((path: string) => {
+        const query = new URLSearchParams(path.split('?')[1]);
+        const savedSecond = query.has('savedPacksCursor');
+        const favoriteSecond = query.has('favoriteStickersCursor');
+
+        return Promise.resolve({
+          favoriteStickers: favoriteSecond
+            ? [{ id: 'fav-2' }]
+            : [{ id: 'fav-1' }],
+          favoriteStickersNextCursor: favoriteSecond ? null : 'fav-next',
+          recentStickers: [{ id: 'recent-1' }],
+          savedPacks: savedSecond ? [{ id: 'saved-2' }] : [{ id: 'saved-1' }],
+          savedPacksNextCursor: savedSecond ? null : 'saved-next',
+        });
+      });
+      const signer = mock<RequestSigner>();
+      const session = {} as unknown as Session;
+
+      signer.headers.mockResolvedValue({ signature: 's' });
+
+      await expect(
+        apiWith(request, signer).getMyStickers(session),
+      ).resolves.toEqual({
+        favoriteStickers: [{ id: 'fav-1' }, { id: 'fav-2' }],
+        recentStickers: [{ id: 'recent-1' }],
+        savedPacks: [{ id: 'saved-1' }, { id: 'saved-2' }],
+      });
+      expect(request.mock.calls.map(([path]) => path)).toEqual([
+        '/stickers/library?favoriteStickersLimit=100&savedPacksLimit=100',
+        '/stickers/library?favoriteStickersLimit=100&savedPacksLimit=100&savedPacksCursor=saved-next',
+        '/stickers/library?favoriteStickersLimit=100&savedPacksLimit=100',
+        '/stickers/library?favoriteStickersLimit=100&savedPacksLimit=100&favoriteStickersCursor=fav-next',
+      ]);
+      expect(signer.headers).toHaveBeenCalledWith(
+        session,
+        'GET',
+        '/stickers/library',
+      );
+    });
+  });
 });

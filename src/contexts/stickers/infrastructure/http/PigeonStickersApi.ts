@@ -9,8 +9,25 @@ import type { StickerPackResource } from './resources/StickerPackResource';
 import type { StickerResource } from './resources/StickerResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import {
+  PAGE_LIMIT,
+  pagedPath,
+} from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { PublicImageUploadPreparer } from '../../../attachments/infrastructure/media/PublicImageUploadPreparer';
+
+type StickerPackPage = {
+  nextCursor: string | null;
+  results: StickerPackResource[];
+};
+
+type LibraryPage = MyStickersResource & {
+  favoriteStickersNextCursor: string | null;
+  savedPacksNextCursor: string | null;
+};
+
+type LibraryCursorPage = LibraryPage & { nextCursor: string | null };
 
 export class PigeonStickersApi {
   public constructor(
@@ -200,20 +217,21 @@ export class PigeonStickersApi {
       ownerIdentityId?: string;
     } = {},
   ): Promise<StickerPackResource[]> {
-    const query = new URLSearchParams();
+    const filters = new URLSearchParams();
 
     if (input.ownerIdentityId) {
-      query.set('ownerIdentityId', input.ownerIdentityId);
+      filters.set('ownerIdentityId', input.ownerIdentityId);
     }
 
-    const path = `/stickers/packs${query.size ? `?${query.toString()}` : ''}`;
-    const response = await this.http.request<{
-      results: StickerPackResource[];
-    }>(path, {
-      method: 'GET',
-    });
+    const pages = await readAllPages<StickerPackPage>(
+      async (cursor) =>
+        await this.http.request<StickerPackPage>(
+          pagedPath('/stickers/packs', cursor, filters),
+          { method: 'GET' },
+        ),
+    );
 
-    return response.results;
+    return pages.flatMap((page) => page.results);
   }
 
   public async getPack(packId: string): Promise<StickerPackResource> {
@@ -226,9 +244,51 @@ export class PigeonStickersApi {
   }
 
   public async getMyStickers(session: Session): Promise<MyStickersResource> {
-    const path = '/stickers/library';
+    const savedPages = await readAllPages<LibraryCursorPage>(async (cursor) => {
+      const page = await this.readLibraryPage(session, {
+        savedPacks: cursor,
+      });
 
-    return await this.http.request<MyStickersResource>(path, {
+      return { ...page, nextCursor: page.savedPacksNextCursor };
+    });
+    const favoritePages = await readAllPages<LibraryCursorPage>(
+      async (cursor) => {
+        const page = await this.readLibraryPage(session, {
+          favoriteStickers: cursor,
+        });
+
+        return { ...page, nextCursor: page.favoriteStickersNextCursor };
+      },
+    );
+    const [first] = savedPages;
+
+    return {
+      favoriteStickers: favoritePages.flatMap((page) => page.favoriteStickers),
+      recentStickers: first.recentStickers,
+      savedPacks: savedPages.flatMap((page) => page.savedPacks),
+    };
+  }
+
+  /** One library page. Each list is paged by its own cursor. */
+  private async readLibraryPage(
+    session: Session,
+    cursors: { favoriteStickers?: string; savedPacks?: string },
+  ): Promise<LibraryPage> {
+    const path = '/stickers/library';
+    const query = new URLSearchParams({
+      favoriteStickersLimit: String(PAGE_LIMIT),
+      savedPacksLimit: String(PAGE_LIMIT),
+    });
+
+    if (cursors.favoriteStickers !== undefined) {
+      query.set('favoriteStickersCursor', cursors.favoriteStickers);
+    }
+
+    if (cursors.savedPacks !== undefined) {
+      query.set('savedPacksCursor', cursors.savedPacks);
+    }
+
+    return await this.http.request<LibraryPage>(`${path}?${query.toString()}`, {
       headers: await this.signer.headers(session, 'GET', path),
       method: 'GET',
     });
