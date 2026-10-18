@@ -35,6 +35,8 @@ export class CallPeerConnections {
   private readonly recovery = new CallPeerRecovery(
     (peerIdentityId, peer, canRestart) =>
       this.refreshAndRestartIce(peerIdentityId, peer, canRestart),
+    (peerIdentityId, canRestart) =>
+      this.replaceStalledPeer(peerIdentityId, canRestart),
   );
 
   private readonly peerSignalSenders = new Map<string, SignalSender>();
@@ -367,6 +369,29 @@ export class CallPeerConnections {
     this.closePeer(peerIdentityId);
 
     return await this.getOrCreatePeer(peerIdentityId, sendSignal);
+  }
+
+  /**
+   * Replaces a connection whose ICE connected while its DTLS never finished.
+   * Then offers on the new connection, which the remote peer answers.
+   */
+  private async replaceStalledPeer(
+    peerIdentityId: string,
+    canRestart: () => boolean,
+  ): Promise<void> {
+    const sendSignal = this.peerSignalSenders.get(peerIdentityId);
+
+    if (!sendSignal || !canRestart()) return;
+
+    const replacement = await this.replacePeer(peerIdentityId, sendSignal);
+
+    if (replacement)
+      await this.negotiation.offerIfNeeded(
+        peerIdentityId,
+        replacement,
+        true,
+        sendSignal,
+      );
   }
 
   public configure(rtcConfigurationProvider: RtcConfigurationProvider): void {

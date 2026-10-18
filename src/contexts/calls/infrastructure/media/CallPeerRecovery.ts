@@ -44,6 +44,10 @@ export class CallPeerRecovery {
       peer: RTCPeerConnection,
       canRestart: () => boolean,
     ) => Promise<void>,
+    private readonly replaceConnection: (
+      peerIdentityId: string,
+      canRestart: () => boolean,
+    ) => Promise<void>,
   ) {}
 
   private cancel(peerIdentityId: string): void {
@@ -83,11 +87,13 @@ export class CallPeerRecovery {
   }
 
   /**
-   * ICE that never left `new` includes a peer still waiting for an offer
-   * that may never arrive, which must not look like "Connecting" forever.
+   * A peer still connecting is negotiating: ICE that never left `new` may
+   * wait for an offer that never arrives, and DTLS may never finish after
+   * ICE connected. Neither may look like "Connecting" forever.
    */
   private isNegotiating(peer: RTCPeerConnection): boolean {
     return (
+      peer.connectionState === 'connecting' ||
       peer.iceConnectionState === 'new' ||
       peer.iceConnectionState === 'checking' ||
       peer.signalingState === 'have-local-offer'
@@ -97,6 +103,18 @@ export class CallPeerRecovery {
   private isHealthy(peer: RTCPeerConnection): boolean {
     return (
       peer.connectionState === 'connected' &&
+      (peer.iceConnectionState === 'connected' ||
+        peer.iceConnectionState === 'completed')
+    );
+  }
+
+  /**
+   * ICE connected while DTLS never finished. Restarting ICE keeps that DTLS
+   * transport, so such a connection must be replaced instead.
+   */
+  private isStalledInDtls(peer: RTCPeerConnection): boolean {
+    return (
+      peer.connectionState === 'connecting' &&
       (peer.iceConnectionState === 'connected' ||
         peer.iceConnectionState === 'completed')
     );
@@ -188,10 +206,11 @@ export class CallPeerRecovery {
       !this.isHealthy(peer);
 
     try {
-      await Promise.race([
-        this.restartIce(peerIdentityId, peer, canRestart),
-        cancelled,
-      ]);
+      const action = this.isStalledInDtls(peer)
+        ? this.replaceConnection(peerIdentityId, canRestart)
+        : this.restartIce(peerIdentityId, peer, canRestart);
+
+      await Promise.race([action, cancelled]);
     } catch (error) {
       logCallWarning(this.failureEvent(error), { attempt: attempt + 1 });
     } finally {
