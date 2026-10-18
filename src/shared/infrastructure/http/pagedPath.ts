@@ -1,5 +1,5 @@
 /** The page size the client asks for: the node's maximum. */
-const PAGE_LIMIT = 100;
+export const PAGE_LIMIT = 100;
 
 /**
  * `path` with its page query. The signer signs only the path before `?`, so
