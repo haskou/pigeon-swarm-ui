@@ -7,6 +7,8 @@ import type {
   PrivateBlobUploadRef,
 } from './PrivateBlobUploadLedger';
 
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { PrivateBlobUploadIncompleteError } from '../../domain/errors/PrivateBlobUploadIncompleteError';
 import { PrivateBlobReplicationDomainService } from '../../domain/services/PrivateBlobReplicationDomainService';
 
 export type StoredPrivateBlobReplica = {
@@ -16,6 +18,16 @@ export type StoredPrivateBlobReplica = {
   origin?: string;
   uploadToken: string;
 };
+
+/**
+ * A non-sensitive label for a failed attempt: the HTTP status or the error
+ * class. Messages and bodies can carry identifiers or paths, so they stay out.
+ */
+function describeFailure(error: unknown): string {
+  if (error instanceof HttpJsonError) return `HTTP ${error.status}`;
+
+  return error instanceof Error ? error.name : 'NonError';
+}
 
 export class PrivateBlobReplicator {
   public constructor(
@@ -35,7 +47,8 @@ export class PrivateBlobReplicator {
   /**
    * Uploads every part to every origin (`undefined` is the session node) and
    * resolves with each part's replicas. PrivateBlobReplicationDomainService
-   * abandons the stored replicas and rejects when any part ends with none.
+   * abandons the stored replicas and rejects when any part ends with none; that
+   * rejection carries the reasons of the failed attempts.
    */
   public async storeParts(
     session: Session,
@@ -44,25 +57,34 @@ export class PrivateBlobReplicator {
     origins: (string | undefined)[],
   ): Promise<StoredPrivateBlobReplica[][]> {
     const parts = Array.from({ length: count }, (_, index) => partAt(index));
+    const failures: string[] = [];
 
-    return await PrivateBlobReplicationDomainService.storeParts(
-      {
-        abandon: (replicas) => this.abandon(session, replicas),
-        storePart: async (index) => {
-          const replicas = await Promise.all(
-            origins.map((origin) =>
-              this.storeReplica(session, parts[index], origin),
-            ),
-          );
+    try {
+      return await PrivateBlobReplicationDomainService.storeParts(
+        {
+          abandon: (replicas) => this.abandon(session, replicas),
+          storePart: async (index) => {
+            const replicas = await Promise.all(
+              origins.map((origin) =>
+                this.storeReplica(session, parts[index], origin, failures),
+              ),
+            );
 
-          return replicas.filter(
-            (replica): replica is StoredPrivateBlobReplica =>
-              replica !== undefined,
-          );
+            return replicas.filter(
+              (replica): replica is StoredPrivateBlobReplica =>
+                replica !== undefined,
+            );
+          },
         },
-      },
-      count,
-    );
+        count,
+      );
+    } catch (error) {
+      if (error instanceof PrivateBlobUploadIncompleteError) {
+        throw new PrivateBlobUploadIncompleteError([...new Set(failures)]);
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -88,8 +110,14 @@ export class PrivateBlobReplicator {
     session: Session,
     bytes: ArrayBuffer,
     target: string | undefined,
+    failures: string[],
   ): Promise<StoredPrivateBlobReplica | undefined> {
-    const reservation = await this.uploadWithRetries(session, bytes, target);
+    const reservation = await this.uploadWithRetries(
+      session,
+      bytes,
+      target,
+      failures,
+    );
 
     if (reservation === undefined) return undefined;
 
@@ -102,7 +130,8 @@ export class PrivateBlobReplicator {
 
     try {
       this.ledger.remember(session, [ticket]);
-    } catch {
+    } catch (error) {
+      failures.push(describeFailure(error));
       // Never recorded, so no abandon can reach it: remove it now.
       await this.removeQuietly(ticket);
 
@@ -128,6 +157,7 @@ export class PrivateBlobReplicator {
     session: Session,
     bytes: ArrayBuffer,
     target: string | undefined,
+    failures: string[],
   ): Promise<PrivateBlobReservation | undefined> {
     const { attempts, now, retryDelayMs, wait } = this.options;
     let reservation: PrivateBlobReservation | undefined;
@@ -152,7 +182,9 @@ export class PrivateBlobReplicator {
         );
 
         return reservation;
-      } catch {
+      } catch (error) {
+        failures.push(describeFailure(error));
+
         if (attempt < attempts) await wait(retryDelayMs * attempt);
       }
     }

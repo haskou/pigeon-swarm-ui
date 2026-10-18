@@ -4,6 +4,7 @@ import type { Session } from '../../../../../contexts/identities/infrastructure/
 import { PrivateBlobUploadIncompleteError } from '../../../../../contexts/attachments/domain/errors/PrivateBlobUploadIncompleteError';
 import { PrivateBlobReplicator } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobReplicator';
 import { PrivateBlobUploadLedger } from '../../../../../contexts/attachments/infrastructure/http/PrivateBlobUploadLedger';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 describe(PrivateBlobReplicator.name, () => {
   const session = {
@@ -205,6 +206,46 @@ describe(PrivateBlobReplicator.name, () => {
       origin: nodeA,
       uploadToken: `blob-${nodeA}-upload`,
     });
+  });
+
+  it('reports the HTTP status of refused uploads as the reason', async () => {
+    const upload = jest
+      .fn()
+      .mockRejectedValue(
+        new HttpJsonError(
+          500,
+          'Internal Server Error',
+          '{"code":"Error","message":"EACCES: permission denied"}',
+        ),
+      );
+    const { replicator } = setup({ upload });
+
+    const error = await replicator
+      .storeParts(session, parts.length, (index) => parts[index]!, origins)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PrivateBlobUploadIncompleteError);
+    expect((error as PrivateBlobUploadIncompleteError).reasons).toEqual([
+      'HTTP 500',
+    ]);
+  });
+
+  it('reports the error class, never the message, when a request fails without a response', async () => {
+    const upload = jest
+      .fn()
+      .mockRejectedValue(
+        new TypeError('Failed to fetch https://node-a.example/private-blobs'),
+      );
+    const { replicator } = setup({ upload });
+
+    const error = await replicator
+      .storeParts(session, parts.length, (index) => parts[index]!, origins)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PrivateBlobUploadIncompleteError);
+    expect((error as PrivateBlobUploadIncompleteError).reasons).toEqual([
+      'TypeError',
+    ]);
   });
 
   it('abandon deletes each replica with its upload token and keeps going past failures', async () => {
