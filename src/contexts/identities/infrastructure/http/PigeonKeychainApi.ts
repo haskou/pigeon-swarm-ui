@@ -12,6 +12,7 @@ import type { Session } from '../session/Session';
 import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
+import { waitBeforeRetry } from '../../../../shared/infrastructure/http/waitBeforeRetry';
 
 const remoteKeychainCacheTtlMs = 1500;
 // A keychain this session already knows about can be briefly unreadable right
@@ -21,26 +22,6 @@ const keychainLagRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
 
 function keychainPath(session: Session): string {
   return `/keychains/${encodeURIComponent(session.identity.id)}`;
-}
-
-function waitBeforeRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(signal.reason);
-
-      return;
-    }
-
-    const timer = setTimeout(resolve, delayMs);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        reject(signal?.reason);
-      },
-      { once: true },
-    );
-  });
 }
 
 export class PigeonKeychainApi {
