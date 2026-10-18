@@ -577,7 +577,7 @@ describe(PigeonCommunitiesApi.name, () => {
         if (path === '/communities/community-1')
           return { networkId: 'network-1' };
 
-        if (path === '/community-membership-requests') {
+        if (path.startsWith('/community-membership-requests?')) {
           return { requests: [request] };
         }
 
@@ -602,7 +602,7 @@ describe(PigeonCommunitiesApi.name, () => {
       .filter(([path]: [string]) => !path.endsWith('/frontier'))
       .filter(
         ([path]: [string]) =>
-          path !== '/community-membership-requests' &&
+          !path.startsWith('/community-membership-requests?') &&
           path !== '/communities/community-1',
       )
       .map(
@@ -971,7 +971,7 @@ describe(PigeonCommunitiesApi.name, () => {
       await api.discover(session, { networkId: 'network-1', query: 'api' });
 
       expect((http.request as jest.Mock).mock.calls.pop()).toEqual([
-        '/discoverable-communities?query=api&networkId=network-1',
+        '/discoverable-communities?query=api&networkId=network-1&limit=100',
         expect.objectContaining({ method: 'GET' }),
       ]);
     });

@@ -30,6 +30,8 @@ import type { CommunityVisibilityResource as CommunityVisibility } from './resou
 import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from './resources/CommunityVoiceChannelResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
@@ -487,6 +489,22 @@ export class PigeonCommunitiesApi {
     return response as unknown as MessageResource;
   }
 
+  /** Every page of a cursor-paged list, each request signed per path. */
+  private async readPagedList<Page extends { nextCursor: string | null }>(
+    session: Session,
+    path: string,
+    filters?: URLSearchParams,
+  ): Promise<Page[]> {
+    return await readAllPages<Page>(async (cursor) => {
+      const target = pagedPath(path, cursor, filters);
+
+      return await this.http.request<Page>(target, {
+        headers: await this.signer.headers(session, 'GET', target),
+        method: 'GET',
+      });
+    });
+  }
+
   public async frontier(
     session: Session,
     communityId: string,
@@ -559,21 +577,31 @@ export class PigeonCommunitiesApi {
     input: { networkId?: string; query?: string },
   ): Promise<CommunityDiscoveryResource[]> {
     const path = '/discoverable-communities';
-    const query = new URLSearchParams();
+    const filters = new URLSearchParams();
     const body = {};
 
-    if (input.query?.trim()) query.set('query', input.query.trim());
+    if (input.query?.trim()) filters.set('query', input.query.trim());
 
-    if (input.networkId?.trim()) query.set('networkId', input.networkId.trim());
+    if (input.networkId?.trim()) {
+      filters.set('networkId', input.networkId.trim());
+    }
 
-    const result = await this.http.request<{
+    const pages = await readAllPages<{
       communities: CommunityDiscoveryResource[];
-    }>(`${path}${query.size > 0 ? `?${query.toString()}` : ''}`, {
-      headers: await this.signer.headers(session, 'GET', path, body),
-      method: 'GET',
+      nextCursor: string | null;
+    }>(async (cursor) => {
+      const target = pagedPath(path, cursor, filters);
+
+      return await this.http.request<{
+        communities: CommunityDiscoveryResource[];
+        nextCursor: string | null;
+      }>(target, {
+        headers: await this.signer.headers(session, 'GET', path, body),
+        method: 'GET',
+      });
     });
 
-    return result.communities;
+    return pages.flatMap((page) => page.communities);
   }
 
   public async create(
@@ -858,19 +886,19 @@ export class PigeonCommunitiesApi {
     session: Session,
   ): Promise<CommunityMembershipRequest[]> {
     const path = '/community-membership-requests';
-    const result = await this.cachedRequest(
+
+    return await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<{
+      async () => {
+        const pages = await this.readPagedList<{
+          nextCursor: string | null;
           requests: CommunityMembershipRequest[];
-        }>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
+        }>(session, path);
+
+        return pages.flatMap((page) => page.requests);
+      },
       { ttlMs: startupReadCacheTtlMs },
     );
-
-    return result.requests;
   }
 
   public async updateMembershipRequest(
@@ -958,12 +986,12 @@ export class PigeonCommunitiesApi {
     communityId: string,
   ): Promise<string[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/members`;
-    const result = await this.http.request<{ memberIds: string[] }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    const pages = await this.readPagedList<{
+      memberIds: string[];
+      nextCursor: string | null;
+    }>(session, path);
 
-    return result.memberIds;
+    return pages.flatMap((page) => page.memberIds);
   }
 
   public async listRoles(
@@ -971,14 +999,12 @@ export class PigeonCommunitiesApi {
     communityId: string,
   ): Promise<CommunityRoleResource[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/roles`;
-    const result = await this.http.request<{
+    const pages = await this.readPagedList<{
+      nextCursor: string | null;
       roles: CommunityRoleResource[];
-    }>(path, {
-      headers: await this.signer.headers(session, 'GET', path),
-      method: 'GET',
-    });
+    }>(session, path);
 
-    return result.roles;
+    return pages.flatMap((page) => page.roles);
   }
 
   public async createRole(
@@ -1185,19 +1211,19 @@ export class PigeonCommunitiesApi {
     communityId: string,
   ): Promise<CommunityChannel[]> {
     const path = `/communities/${encodeURIComponent(communityId)}/channels`;
-    const result = await this.cachedRequest(
+
+    return await this.cachedRequest(
       this.channelListCacheKey(session, communityId),
-      async () =>
-        await this.http.request<{
+      async () => {
+        const pages = await this.readPagedList<{
           channels: CommunityChannel[];
-        }>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
+          nextCursor: string | null;
+        }>(session, path);
+
+        return pages.flatMap((page) => page.channels);
+      },
       { ttlMs: startupReadCacheTtlMs },
     );
-
-    return result.channels;
   }
 
   public async renameChannel(
@@ -1442,11 +1468,17 @@ export class PigeonCommunitiesApi {
 
     return await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
-      async () =>
-        await this.http.request<CommunityChannelMessagePinsResource>(path, {
-          headers: await this.signer.headers(session, 'GET', path),
-          method: 'GET',
-        }),
+      async () => {
+        const pages = await this.readPagedList<
+          CommunityChannelMessagePinsResource & { nextCursor: string | null }
+        >(session, path);
+
+        return {
+          channelId,
+          communityId,
+          pins: pages.flatMap((page) => page.pins),
+        };
+      },
       { ttlMs: startupReadCacheTtlMs },
     );
   }
@@ -1508,22 +1540,20 @@ export class PigeonCommunitiesApi {
     return await this.cachedRequest(
       `GET ${path} ${session.identity.id}`,
       async () => {
-        const result = await this.http.request<CommunityChannelDraftsResource>(
-          path,
-          {
-            headers: await this.signer.headers(session, 'GET', path),
-            method: 'GET',
-          },
+        const pages = await this.readPagedList<
+          CommunityChannelDraftsResource & { nextCursor: string | null }
+        >(session, path);
+
+        return pages.flatMap((page) =>
+          page.drafts.flatMap((draft) => {
+            const content = this.draftPayloads.decrypt(
+              session,
+              draft.encryptedPayload,
+            );
+
+            return content === null ? [] : [{ ...draft, content }];
+          }),
         );
-
-        return result.drafts.flatMap((draft) => {
-          const content = this.draftPayloads.decrypt(
-            session,
-            draft.encryptedPayload,
-          );
-
-          return content === null ? [] : [{ ...draft, content }];
-        });
       },
       { ttlMs: startupReadCacheTtlMs },
     );
