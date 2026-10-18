@@ -170,10 +170,8 @@ export function ImageAttachmentAlbum({
             >
               <button
                 type="button"
-                onClick={() => {
-                  if (lightboxImages.length === 0 || lightboxIndex < 0) return;
-                  onOpen(lightboxImages, lightboxIndex);
-                }}
+                disabled={lightboxIndex < 0}
+                onClick={() => onOpen(lightboxImages, lightboxIndex)}
                 className="h-full w-full transition hover:opacity-90"
                 aria-label={copy.attachments.openImage}
               >
