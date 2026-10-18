@@ -16,6 +16,8 @@ import type { CommunityInvitationPreviewResource } from './resources/CommunityIn
 import type { CommunityInvitationResource } from './resources/CommunityInvitationResource';
 
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
+import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
+import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { NotificationMutationSigner } from '../../../notifications/infrastructure/http/NotificationMutationSigner';
@@ -64,6 +66,21 @@ export class PigeonCommunityInvitationApi {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       headers: await this.signer.headers(session, method, path, body),
       method,
+    });
+  }
+
+  /** Every page of a cursor-paged list, each request signed per path. */
+  private async readPagedList<Page extends { nextCursor: string | null }>(
+    session: Session,
+    path: string,
+  ): Promise<Page[]> {
+    return await readAllPages<Page>(async (cursor) => {
+      const target = pagedPath(path, cursor);
+
+      return await this.http.request<Page>(target, {
+        headers: await this.signer.headers(session, 'GET', target),
+        method: 'GET',
+      });
     });
   }
 
@@ -133,11 +150,12 @@ export class PigeonCommunityInvitationApi {
     session: Session,
     communityId: string,
   ): Promise<CommunityInvitationResource[]> {
-    const { invitations } = await this.signedRequest<{
+    const pages = await this.readPagedList<{
       invitations: CommunityInvitationResource[];
-    }>(session, 'GET', `${this.basePath(communityId)}/invitations`);
+      nextCursor: string | null;
+    }>(session, `${this.basePath(communityId)}/invitations`);
 
-    return invitations;
+    return pages.flatMap((page) => page.invitations);
   }
 
   /** What the link names; the node answers only to the invitation's key. */
@@ -216,11 +234,12 @@ export class PigeonCommunityInvitationApi {
     session: Session,
     communityId: string,
   ): Promise<CommunityInvitationClaimResource[]> {
-    const { claims } = await this.signedRequest<{
+    const pages = await this.readPagedList<{
       claims: CommunityInvitationClaimResource[];
-    }>(session, 'GET', `${this.basePath(communityId)}/invitation-claims`);
+      nextCursor: string | null;
+    }>(session, `${this.basePath(communityId)}/invitation-claims`);
 
-    return claims;
+    return pages.flatMap((page) => page.claims);
   }
 
   /** Admits a claimant: a signed `member_joined` that carries its proofs. */
