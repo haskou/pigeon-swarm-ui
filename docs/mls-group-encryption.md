@@ -594,13 +594,17 @@ call key. Safari is not covered by CI.
     that this device has not read stays unreadable, also from the stored
     state. Within those epochs, MLS keeps the keys of up to 10 skipped
     messages per sender (`retainKeysForGenerations`).
-  - In memory, a group keeps the state before a commit only for its last 8
-    commits (`RETAINED_EPOCHS` in the library, the window of
-    `retainKeysForEpochs`), so that it can switch to a competing commit
-    within them. The state before an older commit is dropped and only its
-    roster change, which holds no secrets, is kept: a rival commit for an
-    older epoch is ignored as stale, which is also what a restarted device
-    does for every past epoch.
+  - In memory, a group keeps the state before a commit for at most its last
+    8 commits (`RETAINED_EPOCHS` in the library, the window of
+    `retainKeysForEpochs`), so that it can switch to a competing commit that
+    wins its epoch. Those states hold older epoch secrets, call-media
+    exporters included, until a newer commit pushes them out of the window
+    or the app reloads; pruning follows commits, not time. A dropped state
+    is released for garbage collection, not zeroised. For an older commit
+    only its record is kept (commit id, roster frontier and roster change,
+    no key material). A rival commit for an epoch past the window is ignored
+    as stale, as a restarted device does for every past epoch; a commit
+    delivered again is ignored as a duplicate.
   - Forward secrecy covers keys, not what was read. The community engine
     keeps every plaintext it sent or decrypted (the plaintext cache, sealed
     as below), so a restarted device reads a message again after its key is
@@ -667,8 +671,9 @@ call key. Safari is not covered by CI.
   root drops the identity's rows. Forgetting the device deletes them. Rows
   stored unsealed before #376 are dropped by the database upgrade, never read.
   XSS in an unlocked session still reads the state in memory, including the
-  state before each of its last 8 commits; the state before an older commit
-  is dropped.
+  states before up to its last 8 commits, with their older epoch secrets
+  (call-media exporters included); the state before an older commit is
+  released for garbage collection, not zeroised.
 - The roster, not MLS, is authoritative. Clients refuse to add identities that
   are not on the roster. Every commit, made or received, in a community or a
   group conversation, is judged by verified leaf owners only: the committer's
