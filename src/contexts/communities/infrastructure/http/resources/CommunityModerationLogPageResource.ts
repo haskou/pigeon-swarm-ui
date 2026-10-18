@@ -2,5 +2,5 @@ import type { CommunityModerationLogResource } from './CommunityModerationLogRes
 
 export type CommunityModerationLogPageResource = {
   logs: CommunityModerationLogResource[];
-  nextBeforeLogId?: string;
+  nextCursor: string | null;
 };
