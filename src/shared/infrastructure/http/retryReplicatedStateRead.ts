@@ -3,8 +3,10 @@ import { waitBeforeRetry } from './waitBeforeRetry';
 
 // The node answers 503020 while its replicated state is still opening after a
 // restart. That clears within seconds, so every read that can meet it shares
-// this one contract: only 503020 is retried, over a schedule that totals
-// 15.75s before the error is reported.
+// one schedule, which totals 15.75s before the error is reported. Two things
+// are retried on it: a 503020 failure, and a resolved value the caller marks
+// as pending with isPending. The keychain reads use isPending for a 409 miss
+// when the session holds a keychain pointer.
 export const replicatedStateNotReadyCodes: ReadonlySet<string> = new Set([
   '503020',
 ]);
