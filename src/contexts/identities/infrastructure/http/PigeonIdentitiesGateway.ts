@@ -36,6 +36,7 @@ import type { KeychainResource } from './resources/KeychainResource';
 import type { LoginResult } from './resources/LoginResult';
 import type { SelectablePresenceStatusResource as SelectablePresenceStatus } from './resources/SelectablePresenceStatusResource';
 
+import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { DevicePairingError } from '../../domain/DevicePairingError';
 import { DevicePairingCode } from '../../domain/value-objects/DevicePairingCode';
@@ -62,7 +63,9 @@ export class PigeonIdentitiesGateway {
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
     onProgress?.('resolving-identity');
-    const identity = await this.identityProfile.get(identityId);
+    const identity = await retryReplicatedStateRead(
+      async () => await this.identityProfile.get(identityId),
+    );
     onProgress?.('decrypting-keys');
     const session = await this.deviceAuthorization.recover(
       identity,
@@ -267,7 +270,9 @@ export class PigeonIdentitiesGateway {
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
     onProgress?.('resolving-identity');
-    const identity = await this.identityProfile.get(identityId);
+    const identity = await retryReplicatedStateRead(
+      async () => await this.identityProfile.get(identityId),
+    );
     onProgress?.('decrypting-keys');
     const paired = await this.deviceAuthorization.completePairing(
       identity,

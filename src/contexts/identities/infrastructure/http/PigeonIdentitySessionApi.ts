@@ -16,6 +16,7 @@ import type { PigeonDeviceAuthorizationApi } from './PigeonDeviceAuthorizationAp
 import type { PigeonIdentityGateway } from './PigeonIdentityGateway';
 import type { IdentityResource } from './resources/IdentityResource';
 
+import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { LocalDeviceIdentityNotFoundError } from '../storage/LocalDeviceIdentityNotFoundError';
@@ -137,7 +138,9 @@ export class PigeonIdentitySessionApi {
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<Session> {
     onProgress?.('resolving-identity');
-    const identity = await this.identities.get(identityId.trim());
+    const identity = await retryReplicatedStateRead(
+      async () => await this.identities.get(identityId.trim()),
+    );
     onProgress?.('decrypting-keys');
 
     let vaultSession: Awaited<ReturnType<DeviceIdentityVault['unlock']>>;
