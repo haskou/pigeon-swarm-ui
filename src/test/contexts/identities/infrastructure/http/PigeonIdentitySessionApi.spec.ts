@@ -400,11 +400,15 @@ describe(PigeonIdentitySessionApi.name, () => {
       const onProgress = jest.fn();
 
       jest.useFakeTimers();
-      const settled = expect(
-        sessionApi.unlock('identity-1', 'password', onProgress),
-      ).rejects.toBeInstanceOf(HttpJsonError);
-      await jest.runAllTimersAsync();
-      await settled;
+      const rejected = jest.fn();
+      const pending = sessionApi.unlock('identity-1', 'password', onProgress);
+      void pending.catch(rejected);
+
+      await jest.advanceTimersByTimeAsync(15_749);
+      expect(rejected).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(rejected).toHaveBeenCalledWith(expect.any(HttpJsonError));
       expect(http.request).toHaveBeenCalledTimes(9);
       expect(onProgress).not.toHaveBeenCalledWith('decrypting-keys');
     });
