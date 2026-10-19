@@ -33,6 +33,12 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
     };
   }
 
+  function resolveAfter<T>(value: T, ms: number): Promise<T> {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(value), ms);
+    });
+  }
+
   it('hydrates keychain and conversations while reporting workspace progress', async () => {
     const workspace = port();
     const progress = jest.fn() as unknown as LoginIdentityProgressReporter;
@@ -214,11 +220,8 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
 
     it('keeps the node-starting notice up until the conversation list finishes retrying', async () => {
       const workspace = port();
-      workspace.loadKeychain.mockImplementation(
-        () =>
-          new Promise<KeychainResource | undefined>((resolve) => {
-            setTimeout(() => resolve(keychainResource), 500);
-          }),
+      workspace.loadKeychain.mockImplementation(() =>
+        resolveAfter(keychainResource, 500),
       );
       workspace.listConversations
         .mockRejectedValueOnce(notReady)
@@ -228,7 +231,7 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       const onProgress = jest.fn();
 
       const pending = api.hydrate(session, onProgress);
-      // The keychain lands at 500ms while the list still waits for its third attempt at 750ms.
+      // The keychain lands at 500ms; the list still waits for its third try.
       await jest.advanceTimersByTimeAsync(600);
 
       expect(onProgress).toHaveBeenLastCalledWith('node-starting');
