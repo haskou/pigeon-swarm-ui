@@ -106,6 +106,18 @@ export class PigeonKeychainApi {
     );
   }
 
+  // Waits out a node still opening; a missing head reads as undefined.
+  private async fetchRemoteWhenReady(
+    session: Session,
+  ): Promise<KeychainResource | undefined> {
+    return await retryReplicatedStateRead(
+      async () =>
+        await this.undefinedWhenMissing(
+          async () => await this.fetchRemote(session),
+        ),
+    );
+  }
+
   private async postKeychain(
     session: Session,
     head: KeychainHead | undefined,
@@ -139,9 +151,7 @@ export class PigeonKeychainApi {
     openWith: Session,
   ): Promise<void> {
     await this.enqueuePublish(session.identity.id, async () => {
-      const resource = await this.undefinedWhenMissing(
-        async () => await this.fetchRemote(session),
-      );
+      const resource = await this.fetchRemoteWhenReady(session);
 
       if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
         return;
@@ -240,9 +250,7 @@ export class PigeonKeychainApi {
     }
 
     await this.enqueuePublish(session.identity.id, async () => {
-      const resource = await this.undefinedWhenMissing(
-        async () => await this.fetchRemote(session),
-      );
+      const resource = await this.fetchRemoteWhenReady(session);
 
       if (!resource || this.cipher.isSealedUnderRoot(session, resource)) {
         return;

@@ -763,20 +763,20 @@ describe(PigeonKeychainApi.name, () => {
         notReadyReads: number,
       ): PigeonKeychainApi => {
         let remaining = notReadyReads;
+        const request = (
+          _path: string,
+          init: { body?: string; method: string },
+        ): unknown => {
+          if (init.method === 'GET' && remaining > 0) {
+            remaining -= 1;
+            throw notReady();
+          }
+
+          return server.handle(init.method, init.body);
+        };
 
         return new PigeonKeychainApi(
-          {
-            request: jest.fn(
-              async (_path: string, init: { body?: string; method: string }) => {
-                if (init.method === 'GET' && remaining > 0) {
-                  remaining -= 1;
-                  throw notReady();
-                }
-
-                return server.handle(init.method, init.body);
-              },
-            ),
-          } as unknown as HttpJsonClient,
+          { request: jest.fn(request) } as unknown as HttpJsonClient,
           {
             headers: jest.fn().mockResolvedValue({}),
           } as unknown as RequestSigner,
@@ -784,8 +784,10 @@ describe(PigeonKeychainApi.name, () => {
           {
             invalidateForSession: jest.fn(),
             keyForSession: () => 'cache-key',
-            load: async (_key: string, loader: () => Promise<KeychainResource>) =>
-              await loader(),
+            load: async (
+              _key: string,
+              loader: () => Promise<KeychainResource>,
+            ) => await loader(),
           } as unknown as RequestCache,
         );
       };
