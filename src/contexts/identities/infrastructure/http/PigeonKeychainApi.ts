@@ -9,11 +9,14 @@ import type {
   LocalKeychainUpdate,
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
+import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
 import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
+import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { KeychainHeadUnavailableError } from './errors/KeychainHeadUnavailableError';
+import { KeychainNotFoundError } from './errors/KeychainNotFoundError';
 
 const remoteKeychainCacheTtlMs = 1500;
 
@@ -29,6 +32,7 @@ export class PigeonKeychainApi {
     private readonly signer: RequestSigner,
     private readonly cipher: KeychainCipher,
     private readonly requestCache: RequestCache,
+    private readonly vault: DeviceIdentityVault,
   ) {}
 
   private async enqueuePublish<T>(
@@ -204,11 +208,29 @@ export class PigeonKeychainApi {
         throw new KeychainHeadUnavailableError();
       }
 
-      return await this.postKeychain(
-        session,
-        head,
-        update(head?.keychain ?? session.keychain),
-      );
+      if (!head) {
+        // Replication can lag behind a keychain another node already holds.
+        // Only an identity's first keychain, created on this device, may post
+        // without a head. Anything else is refused before it is sent. The
+        // marker clears only after that first publish is accepted.
+        const identityId = IdentityId.fromString(session.identity.id);
+
+        if (!(await this.vault.isFirstKeychainPublishPending(identityId))) {
+          throw new KeychainNotFoundError();
+        }
+
+        const published = await this.postKeychain(
+          session,
+          undefined,
+          update(session.keychain),
+        );
+
+        await this.vault.completeFirstKeychainPublish(identityId);
+
+        return published;
+      }
+
+      return await this.postKeychain(session, head, update(head.keychain));
     });
   }
 

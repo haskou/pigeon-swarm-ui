@@ -114,6 +114,41 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     );
   }
 
+  public async completeFirstKeychainPublish(
+    identityId: IdentityId,
+  ): Promise<void> {
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(identityId.valueOf());
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const record = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          if (record?.version !== 2) {
+            return;
+          }
+
+          store.put({
+            ...record,
+            firstKeychainPublishPending: false,
+            updatedAt: Date.now(),
+          } satisfies DeviceIdentityVaultRecord);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
   public async find(
     identityId: IdentityId,
   ): Promise<DeviceIdentityVaultRecord | undefined> {
@@ -158,7 +193,12 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
             return;
           }
 
-          store.put(next);
+          // A password change keeps the live marker, so a stale copy cannot
+          // revert a first publish that has already been accepted.
+          store.put({
+            ...next,
+            firstKeychainPublishPending: record.firstKeychainPublishPending,
+          } satisfies DeviceIdentityVaultRecord);
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));

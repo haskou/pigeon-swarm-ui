@@ -165,9 +165,28 @@ export class DeviceIdentityVault {
     await this.store.delete(identityId);
   }
 
+  /**
+   * Whether this identity, created on this device, still awaits its first
+   * accepted keychain. Only that first publish may be posted without a head.
+   */
+  public async isFirstKeychainPublishPending(
+    identityId: IdentityId,
+  ): Promise<boolean> {
+    const record = await this.requiredRecord(identityId);
+
+    return record.firstKeychainPublishPending === true;
+  }
+
+  public async completeFirstKeychainPublish(
+    identityId: IdentityId,
+  ): Promise<void> {
+    await this.store.completeFirstKeychainPublish(identityId);
+  }
+
   public async register(input: {
     authorizationEpoch?: DeviceAuthorizationEpoch;
     authorizationRevision?: DeviceAuthorizationRevision;
+    firstKeychainPublishPending?: boolean;
     identityId: IdentityId;
     material: DeviceIdentityKeyMaterial;
     password: string;
@@ -188,14 +207,15 @@ export class DeviceIdentityVault {
       input.authorizationRevision ?? DeviceAuthorizationRevision.initial();
     const createdAt = Date.now();
 
-    await this.store.save(
-      this.record(
+    await this.store.save({
+      ...this.record(
         protectedIdentity,
         authorizationEpoch,
         authorizationRevision,
         createdAt,
       ),
-    );
+      firstKeychainPublishPending: input.firstKeychainPublishPending === true,
+    });
 
     return {
       authorizationEpoch,

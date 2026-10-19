@@ -62,6 +62,20 @@ class MemoryStore implements DeviceIdentityVaultStore {
     return Promise.resolve();
   }
 
+  public completeFirstKeychainPublish(identityId: IdentityId): Promise<void> {
+    const record = this.records.get(identityId.valueOf());
+
+    if (record) {
+      this.records.set(identityId.valueOf(), {
+        ...record,
+        firstKeychainPublishPending: false,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return Promise.resolve();
+  }
+
   public find(
     identityId: IdentityId,
   ): Promise<DeviceIdentityVaultRecord | undefined> {
@@ -89,7 +103,10 @@ class MemoryStore implements DeviceIdentityVaultStore {
       );
     }
 
-    this.records.set(next.identityId, next);
+    this.records.set(next.identityId, {
+      ...next,
+      firstKeychainPublishPending: record.firstKeychainPublishPending,
+    });
 
     return Promise.resolve();
   }
@@ -302,5 +319,67 @@ describe(DeviceIdentityVault.name, () => {
 
     const restored = await vault.unlock(source.identityId, password);
     expect(restored.authorizationRevision.valueOf()).toBe(4);
+  });
+
+  describe('first keychain publish marker', () => {
+    it('marks an identity registered as created on this device', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({
+        ...source,
+        firstKeychainPublishPending: true,
+        password,
+      });
+
+      await expect(
+        vault.isFirstKeychainPublishPending(source.identityId),
+      ).resolves.toBe(true);
+    });
+
+    it('does not mark an identity registered without the creation flag', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({ ...source, password });
+
+      await expect(
+        vault.isFirstKeychainPublishPending(source.identityId),
+      ).resolves.toBe(false);
+    });
+
+    it('keeps the marker through a password change', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({
+        ...source,
+        firstKeychainPublishPending: true,
+        password,
+      });
+
+      await vault.changePassword(source.identityId, password, nextPassword);
+
+      await expect(
+        vault.isFirstKeychainPublishPending(source.identityId),
+      ).resolves.toBe(true);
+    });
+
+    it('clears the marker once the first keychain publish is accepted', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({
+        ...source,
+        firstKeychainPublishPending: true,
+        password,
+      });
+
+      await vault.completeFirstKeychainPublish(source.identityId);
+
+      await expect(
+        vault.isFirstKeychainPublishPending(source.identityId),
+      ).resolves.toBe(false);
+    });
   });
 });

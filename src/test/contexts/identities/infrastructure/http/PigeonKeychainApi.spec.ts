@@ -9,10 +9,12 @@ import type { KeychainResource } from '../../../../../contexts/identities/infras
 import type { ConversationKeyEntry } from '../../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
+import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
+import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { KeychainCipher } from '../../../../../contexts/identities/infrastructure/crypto/KeychainCipher';
 import { PigeonKeychainApi } from '../../../../../contexts/identities/infrastructure/http/PigeonKeychainApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
@@ -22,6 +24,13 @@ const owner = KeyPair.fromPrimitives({
   publicKey: vectors.keys.owner.publicKeyPem,
 } as never);
 const ownerIdentity = { id: vectors.keys.owner.publicKeyPem };
+
+// Stands for the device vault. A freshly created identity starts awaiting its
+// first keychain publish, so the default marks it pending.
+const firstPublishVault = {
+  completeFirstKeychainPublish: jest.fn().mockResolvedValue(undefined),
+  isFirstKeychainPublishPending: jest.fn().mockResolvedValue(true),
+} as unknown as DeviceIdentityVault;
 
 type StoredKeychain = {
   encryptedPayload: string;
@@ -159,6 +168,7 @@ describe(PigeonKeychainApi.name, () => {
         keyForSession: jest.fn().mockReturnValue('cache-key'),
         load,
       } as unknown as RequestCache,
+      firstPublishVault,
     );
 
     await expect(api.load(session)).resolves.toBe(resource);
@@ -179,6 +189,7 @@ describe(PigeonKeychainApi.name, () => {
       {} as RequestSigner,
       { decrypt } as unknown as KeychainCipher,
       {} as RequestCache,
+      firstPublishVault,
     );
     const resource = { encryptedPayload: 'encrypted' } as KeychainResource;
 
@@ -211,6 +222,7 @@ describe(PigeonKeychainApi.name, () => {
         keyForSession: jest.fn().mockReturnValue('cache-key'),
         load,
       } as unknown as RequestCache,
+      firstPublishVault,
     );
 
     await expect(api.loadOptional(session)).resolves.toBeUndefined();
@@ -247,6 +259,7 @@ describe(PigeonKeychainApi.name, () => {
       { headers: jest.fn().mockResolvedValue({}) } as unknown as RequestSigner,
       new KeychainCipher(),
       { invalidateForSession: jest.fn() } as unknown as RequestCache,
+      firstPublishVault,
     );
 
     await Promise.all([
@@ -312,6 +325,7 @@ describe(PigeonKeychainApi.name, () => {
     function apiFor(
       request: jest.Mock,
       cipher: KeychainCipher = {} as KeychainCipher,
+      deviceVault: DeviceIdentityVault = firstPublishVault,
     ): PigeonKeychainApi {
       return new PigeonKeychainApi(
         { request } as unknown as HttpJsonClient,
@@ -325,6 +339,7 @@ describe(PigeonKeychainApi.name, () => {
           load: async (_key: string, loader: () => Promise<KeychainResource>) =>
             await loader(),
         } as unknown as RequestCache,
+        deviceVault,
       );
     }
 
@@ -377,6 +392,26 @@ describe(PigeonKeychainApi.name, () => {
 
       await expect(pending).resolves.toBe(keychainResource);
       expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries two consecutive 503020 reads when the session holds no keychain pointer', async () => {
+      const notReady = (): HttpJsonError =>
+        new HttpJsonError(
+          503,
+          'Service Unavailable',
+          JSON.stringify({ code: 503020 }),
+        );
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(notReady())
+        .mockRejectedValueOnce(notReady())
+        .mockResolvedValueOnce(keychainResource);
+      const pending = apiFor(request).loadOptional(session);
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toBe(keychainResource);
+      expect(request).toHaveBeenCalledTimes(3);
     });
 
     it('reads once when the session holds no keychain pointer so login and registration are not delayed', async () => {
@@ -500,6 +535,109 @@ describe(PigeonKeychainApi.name, () => {
       expect(server.headConversationIds()).toEqual(['conversation-a']);
     });
 
+    it('refuses a first publish without the first-publish marker before anything is posted', async () => {
+      const server = new FakeKeychainServer();
+      const request = jest.fn(
+        (_path: string, init: { body?: string; method: string }) =>
+          server.handle(init.method, init.body),
+      );
+      const deviceVault = {
+        completeFirstKeychainPublish: jest.fn(),
+        isFirstKeychainPublishPending: jest.fn().mockResolvedValue(false),
+      } as unknown as DeviceIdentityVault;
+      const session = {
+        ...signingSession,
+        keychain: emptyKeychain,
+        keychainExternalIdentifier: null,
+      } as unknown as Session;
+
+      await expect(
+        apiFor(request, new KeychainCipher(), deviceVault).publishKeychain(
+          session,
+          (current) => current,
+        ),
+      ).rejects.toMatchObject({ name: 'KeychainNotFoundError' });
+
+      expect(
+        request.mock.calls.filter(([, init]) => init.method === 'POST'),
+      ).toEqual([]);
+      expect(server.headConversationIds()).toEqual([]);
+    });
+
+    it('clears the first-publish marker only after the first keychain is accepted', async () => {
+      const server = new FakeKeychainServer();
+      const request = jest.fn(
+        (_path: string, init: { body?: string; method: string }) =>
+          server.handle(init.method, init.body),
+      );
+      const deviceVault = {
+        completeFirstKeychainPublish: jest.fn().mockResolvedValue(undefined),
+        isFirstKeychainPublishPending: jest.fn().mockResolvedValue(true),
+      } as unknown as DeviceIdentityVault;
+      const session = {
+        ...signingSession,
+        keychain: emptyKeychain,
+        keychainExternalIdentifier: null,
+      } as unknown as Session;
+      const identityId = IdentityId.fromString(ownerIdentity.id);
+
+      await expect(
+        apiFor(request, new KeychainCipher(), deviceVault).publishKeychain(
+          session,
+          (current) => ({
+            ...current,
+            conversations: {
+              ...current.conversations,
+              'conversation-a': {
+                conversationId: 'conversation-a',
+              } as ConversationKeyEntry,
+            },
+          }),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+
+      expect(deviceVault.isFirstKeychainPublishPending).toHaveBeenCalledWith(
+        identityId,
+      );
+      expect(deviceVault.completeFirstKeychainPublish).toHaveBeenCalledTimes(1);
+      expect(deviceVault.completeFirstKeychainPublish).toHaveBeenCalledWith(
+        identityId,
+      );
+    });
+
+    it('keeps the first-publish marker when the first keychain post is refused', async () => {
+      const server = new FakeKeychainServer();
+      const request = jest.fn(
+        (_path: string, init: { body?: string; method: string }) => {
+          if (init.method === 'POST') {
+            return Promise.reject(
+              new HttpJsonError(500, 'Internal Server Error', '{}'),
+            );
+          }
+
+          return Promise.resolve(server.handle(init.method, init.body));
+        },
+      );
+      const deviceVault = {
+        completeFirstKeychainPublish: jest.fn().mockResolvedValue(undefined),
+        isFirstKeychainPublishPending: jest.fn().mockResolvedValue(true),
+      } as unknown as DeviceIdentityVault;
+      const session = {
+        ...signingSession,
+        keychain: emptyKeychain,
+        keychainExternalIdentifier: null,
+      } as unknown as Session;
+
+      await expect(
+        apiFor(request, new KeychainCipher(), deviceVault).publishKeychain(
+          session,
+          (current) => current,
+        ),
+      ).rejects.toThrow();
+
+      expect(deviceVault.completeFirstKeychainPublish).not.toHaveBeenCalled();
+    });
+
     it('fails the publish instead of posting a root when the session holds a pointer and the head stays missing', async () => {
       const request = jest.fn((_path: string, init: { method: string }) => {
         if (init.method === 'GET') {
@@ -618,6 +756,7 @@ describe(PigeonKeychainApi.name, () => {
           load: async (_key: string, loader: () => Promise<KeychainResource>) =>
             await loader(),
         } as unknown as RequestCache,
+        firstPublishVault,
       );
 
     it('reads the head under the session root', async () => {
@@ -866,6 +1005,7 @@ describe(PigeonKeychainApi.name, () => {
               loader: () => Promise<KeychainResource>,
             ) => await loader(),
           } as unknown as RequestCache,
+          firstPublishVault,
         );
       };
 

@@ -16,6 +16,7 @@ export interface DeviceIdentityVaultStore {
     revision: DeviceAuthorizationRevision,
   ): Promise<void>;
   delete(identityId: IdentityId): Promise<void>;
+  completeFirstKeychainPublish(identityId: IdentityId): Promise<void>;
   find(identityId: IdentityId): Promise<DeviceIdentityVaultRecord | undefined>;
   save(record: DeviceIdentityVaultRecord): Promise<void>;
   replaceProtection(

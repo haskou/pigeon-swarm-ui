@@ -112,6 +112,10 @@ describe(PigeonIdentityCommandsApi.name, () => {
     });
     expectIdentitySigned(http, created.keyPair);
 
+    expect(vault.register).toHaveBeenCalledWith(
+      expect.objectContaining({ firstKeychainPublishPending: true }),
+    );
+
     expect(http.request).toHaveBeenCalledWith(
       '/identities',
       expect.objectContaining({
@@ -458,6 +462,19 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     expect(jest.mocked(http.request).mock.calls[0]?.[1]?.headers).toEqual({
       'X-Signature': 'signed',
     });
+  });
+
+  it('marks the identity created on this device as awaiting its first keychain publish', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(identity()),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+
+    await created(http, deviceVault, null);
+
+    expect(deviceVault.register).toHaveBeenCalledWith(
+      expect.objectContaining({ firstKeychainPublishPending: true }),
+    );
   });
 
   it('forgets the local device identity when the node refuses the code', async () => {

@@ -6,6 +6,7 @@ export type DeviceIdentityVaultRecord = {
   encryptedMaterial: string;
   envelope: string;
   factorKey: CryptoKey;
+  firstKeychainPublishPending?: boolean;
   identityId: string;
   secretHandle: string;
   updatedAt: number;
