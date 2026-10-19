@@ -9,6 +9,7 @@ import type { LoginResult } from './resources/LoginResult';
 import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import { IdentitySnapshotSelection } from '../../domain/IdentitySnapshotSelection';
 import { KeychainVersion } from '../../domain/value-objects/KeychainVersion';
+import { KeychainHeadUnavailableError } from './errors/KeychainHeadUnavailableError';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},
@@ -32,6 +33,12 @@ export class PigeonIdentityWorkspaceSessionApi {
     session: Session,
     keychainResource: KeychainResource | undefined,
   ): Session {
+    // A pointer means a keychain exists. Reading none is a failed read, not
+    // absence, so sign-in fails instead of continuing with an empty shell.
+    if (!keychainResource && session.keychainExternalIdentifier) {
+      throw new KeychainHeadUnavailableError();
+    }
+
     const keychain = keychainResource
       ? this.workspace.decryptKeychain(session, keychainResource)
       : emptyKeychain;

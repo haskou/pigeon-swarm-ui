@@ -5,6 +5,7 @@ import type { KeychainResource } from '../../../../../contexts/identities/infras
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { KeychainHeadUnavailableError } from '../../../../../contexts/identities/infrastructure/http/errors/KeychainHeadUnavailableError';
 import { PigeonIdentityWorkspaceSessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -223,6 +224,33 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
 
       await expect(api.hydrate(session)).rejects.toBe(failure);
       expect(workspace.listConversations).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects sign-in without a session when the keychain read stays 503020', async () => {
+      const workspace = port();
+      workspace.loadKeychain.mockRejectedValue(notReady);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      await expect(api.hydrate(session)).rejects.toBe(notReady);
+      expect(workspace.decryptKeychain).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when the session holds a keychain pointer', () => {
+    const pointed = {
+      ...session,
+      keychainExternalIdentifier: 'keychain-cid',
+    } as Session;
+
+    it('fails sign-in instead of an empty keychain when the pointed keychain stays unread', async () => {
+      const workspace = port();
+      workspace.loadKeychain.mockResolvedValue(undefined);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      await expect(api.hydrate(pointed)).rejects.toBeInstanceOf(
+        KeychainHeadUnavailableError,
+      );
+      expect(workspace.decryptKeychain).not.toHaveBeenCalled();
     });
   });
 });
