@@ -105,7 +105,7 @@ export function CreateCommunityDialog({
     : null;
   const canAddChannel = channelName.trim().length > 0 && !channelInputError;
   const privateNetworkHelp = nodeNetworksLoadError
-    ? copy.nodeSettings.error
+    ? copy.dialog.networksLoadFailed
     : nodeNetworksLoading
       ? copy.dialog.networksLoading
       : copy.communities.noPrivateNetwork;

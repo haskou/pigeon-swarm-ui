@@ -796,6 +796,8 @@ export const es = {
     groupParticipant: identityLookup.label,
     groupParticipants: 'Participantes',
     loadingIdentity: 'Buscando identidad...',
+    networksLoadFailed:
+      'No se pudieron cargar las redes de este nodo. Inténtalo de nuevo.',
     networksLoading:
       'Cargando redes. Se necesita una red privada para crear esto.',
     noSharedPrivateGroupNetwork:

@@ -656,7 +656,7 @@ export function CreateConversationDialog({
           )}
           {nodeNetworksLoadError && (
             <div className="ui-inline-notice mt-4 border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
-              {copy.nodeSettings.error}
+              {copy.dialog.networksLoadFailed}
             </div>
           )}
 

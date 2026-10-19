@@ -787,6 +787,8 @@ export const en = {
     groupParticipant: identityLookup.label,
     groupParticipants: 'Participants',
     loadingIdentity: 'Looking up identity...',
+    networksLoadFailed:
+      'Networks could not be loaded from this node. Try again.',
     networksLoading:
       'Loading networks. A private network is needed before you can create this.',
     noSharedPrivateGroupNetwork:

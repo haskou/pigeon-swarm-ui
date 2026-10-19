@@ -119,7 +119,7 @@ export function useWorkspaceConversationNavigation({
       if (NullObject.isNullObject(sharedNetwork)) {
         throw new Error(
           nodeNetworksLoadError
-            ? copy.nodeSettings.error
+            ? copy.dialog.networksLoadFailed
             : nodeNetworksLoading
               ? copy.dialog.networksLoading
               : copy.dialog.noSharedPrivateNetwork,
