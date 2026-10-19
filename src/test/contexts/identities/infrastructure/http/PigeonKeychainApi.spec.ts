@@ -750,5 +750,110 @@ describe(PigeonKeychainApi.name, () => {
         });
       });
     });
+
+    describe('while the node opens its state', () => {
+      const notReady = (): HttpJsonError =>
+        new HttpJsonError(
+          503,
+          'Service Unavailable',
+          JSON.stringify({ code: 503020 }),
+        );
+      const replayingOver = (
+        server: FakeKeychainServer,
+        notReadyReads: number,
+      ): PigeonKeychainApi => {
+        let remaining = notReadyReads;
+
+        return new PigeonKeychainApi(
+          {
+            request: jest.fn(
+              async (_path: string, init: { body?: string; method: string }) => {
+                if (init.method === 'GET' && remaining > 0) {
+                  remaining -= 1;
+                  throw notReady();
+                }
+
+                return server.handle(init.method, init.body);
+              },
+            ),
+          } as unknown as HttpJsonClient,
+          {
+            headers: jest.fn().mockResolvedValue({}),
+          } as unknown as RequestSigner,
+          new KeychainCipher(),
+          {
+            invalidateForSession: jest.fn(),
+            keyForSession: () => 'cache-key',
+            load: async (_key: string, loader: () => Promise<KeychainResource>) =>
+              await loader(),
+          } as unknown as RequestCache,
+        );
+      };
+
+      beforeEach(() => {
+        jest.useFakeTimers();
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it('retries a head read answered 503020 before replacing the head', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        const pending = replayingOver(server, 2).replaceHeadAfterRecovery(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+        await jest.runAllTimersAsync();
+        await pending;
+
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-2',
+          previousKeychainExternalIdentifier: 'kc-1',
+          version: 2,
+        });
+      });
+
+      it('retries a head read answered 503020 before resealing the head', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        const pending = replayingOver(server, 1).rewrapHeadSealedUnder(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+          otherKey,
+        );
+        await jest.runAllTimersAsync();
+        await pending;
+
+        const stored = server.handle('GET') as KeychainResource;
+
+        expect(stored).toMatchObject({
+          keychainExternalIdentifier: 'kc-2',
+          previousKeychainExternalIdentifier: 'kc-1',
+          version: 2,
+        });
+        expect(() =>
+          rootKey.decrypt(new EncryptedPayload(stored.encryptedPayload)),
+        ).not.toThrow();
+      });
+
+      it('publishes nothing while the node still answers 503020 after the retry window', async () => {
+        const server = new FakeKeychainServer();
+        server.seedSealed(sealedUnder(otherKey), 'kc-1', 1);
+
+        const pending = replayingOver(server, 100).replaceHeadAfterRecovery(
+          sessionWith({ deviceSealedRootKey: rootKey }),
+        );
+        const settled = expect(pending).rejects.toBeInstanceOf(HttpJsonError);
+        await jest.runAllTimersAsync();
+        await settled;
+
+        expect(server.handle('GET')).toMatchObject({
+          keychainExternalIdentifier: 'kc-1',
+          version: 1,
+        });
+      });
+    });
   });
 });
