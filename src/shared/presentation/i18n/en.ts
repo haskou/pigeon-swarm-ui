@@ -925,6 +925,8 @@ export const en = {
         'One or more selected IPFS networks could not be found.',
       IPFSPeerIdDuplicatedError:
         'That IPFS peer is already registered in another network.',
+      KeychainHeadUnavailableError:
+        'Your keychain is still syncing. Wait a moment and try again.',
       KeychainNotFoundError:
         'No keychain has been published for this identity yet.',
       MessageTargetAlreadyDeletedError:

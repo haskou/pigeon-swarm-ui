@@ -935,6 +935,8 @@ export const es = {
       IPFSNetworksNotFoundByIdsError:
         'No se encontraron una o varias de las redes IPFS seleccionadas.',
       IPFSPeerIdDuplicatedError: 'Ese par IPFS ya está registrado en otra red.',
+      KeychainHeadUnavailableError:
+        'Tu llavero todavía se está sincronizando. Espera un momento y vuelve a intentarlo.',
       KeychainNotFoundError:
         'Esta identidad todavía no ha publicado ningún llavero.',
       MessageTargetAlreadyDeletedError: 'Ese mensaje ya se eliminó.',
