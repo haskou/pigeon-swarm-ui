@@ -41,3 +41,13 @@ export function allowedNetworkIds({
 
   return networkIds.filter((networkId) => privateIds.has(networkId));
 }
+
+/**
+ * The selection to keep: the current network while the node still allows it,
+ * otherwise the first allowed network. Nothing is selected when none is allowed.
+ */
+export function selectNetworkId(current: string, allowedIds: string[]): string {
+  if (allowedIds.includes(current)) return current;
+
+  return allowedIds[0] ?? '';
+}

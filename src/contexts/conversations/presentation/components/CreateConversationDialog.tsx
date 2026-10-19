@@ -29,8 +29,15 @@ import {
   identityPicture,
   publicFileObjectUrl,
 } from '../../../identities/presentation/view-models/identityDisplay';
-import { allowedNetworkIds } from '../../../networks/presentation/view-models/nodeNetworkVisibility';
+import {
+  allowedNetworkIds,
+  selectNetworkId,
+} from '../../../networks/presentation/view-models/nodeNetworkVisibility';
 import { ConversationPeer } from '../view-models/ConversationPeer';
+import {
+  canSubmitDirectConversation,
+  canSubmitGroupConversation,
+} from '../view-models/conversationSubmitGuards';
 import { GroupParticipantSelection } from '../view-models/GroupParticipantSelection';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -151,21 +158,23 @@ export function CreateConversationDialog({
         ) === peerIdentity.id,
     );
   }, [conversations, peerIdentity, session.identity.id, session.keychain]);
-  const canSubmitDirect =
-    !!peerIdentity &&
-    !nodeNetworksLoading &&
-    !nodeNetworksLoadError &&
-    !!selectedNetworkId &&
-    !existingDirectConversation &&
-    state !== 'loading' &&
-    !contactKeyBlocked(peerContact, peerContactAcknowledged);
-  const canSubmitGroup =
-    !nodeNetworksLoading &&
-    !nodeNetworksLoadError &&
-    groupName.trim().length > 0 &&
-    groupParticipants.length > 0 &&
-    !!groupNetworkId &&
-    state !== 'loading';
+  const canSubmitDirect = canSubmitDirectConversation({
+    busy: state === 'loading',
+    contactBlocked: contactKeyBlocked(peerContact, peerContactAcknowledged),
+    hasExistingConversation: !!existingDirectConversation,
+    hasNetwork: !!selectedNetworkId,
+    hasPeer: !!peerIdentity,
+    networksFailed: nodeNetworksLoadError,
+    networksLoading: nodeNetworksLoading,
+  });
+  const canSubmitGroup = canSubmitGroupConversation({
+    busy: state === 'loading',
+    hasGroupName: groupName.trim().length > 0,
+    hasNetwork: !!groupNetworkId,
+    hasParticipants: groupParticipants.length > 0,
+    networksFailed: nodeNetworksLoadError,
+    networksLoading: nodeNetworksLoading,
+  });
   const remoteIdentityStatus = remoteIdentityLookupStatus({
     input: peerIdentityId,
     lookupState,
@@ -272,19 +281,15 @@ export function CreateConversationDialog({
   }, [groupIdentityInput, session.identity.id]);
 
   useEffect(() => {
-    if (groupNetworkId && groupSharedNetworkIds.includes(groupNetworkId)) {
-      return;
-    }
+    const next = selectNetworkId(groupNetworkId, groupSharedNetworkIds);
 
-    setGroupNetworkId(groupSharedNetworkIds[0] ?? '');
+    if (next !== groupNetworkId) setGroupNetworkId(next);
   }, [groupNetworkId, groupSharedNetworkIds]);
 
   useEffect(() => {
-    if (selectedNetworkId && sharedNetworkIds.includes(selectedNetworkId)) {
-      return;
-    }
+    const next = selectNetworkId(selectedNetworkId, sharedNetworkIds);
 
-    setSelectedNetworkId(sharedNetworkIds[0] ?? '');
+    if (next !== selectedNetworkId) setSelectedNetworkId(next);
   }, [selectedNetworkId, sharedNetworkIds]);
 
   const handleSubmit = async (event: FormEvent) => {

@@ -1,6 +1,9 @@
 import type { NodeNetwork } from '../../../../../contexts/networks/presentation/view-models/NodeNetwork';
 
-import { allowedNetworkIds } from '../../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
+import {
+  allowedNetworkIds,
+  selectNetworkId,
+} from '../../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
 
 const ownerPrivate: NodeNetwork = {
   id: 'network-keyed',
@@ -125,5 +128,27 @@ describe(allowedNetworkIds.name, () => {
         privateOnly: false,
       }),
     ).toEqual(['network-keyed', 'network-public']);
+  });
+});
+
+describe(selectNetworkId.name, () => {
+  it('keeps the current network while it is still allowed', () => {
+    expect(
+      selectNetworkId('network-private', ['network-other', 'network-private']),
+    ).toBe('network-private');
+  });
+
+  it('falls back to the first allowed network once the current one is not offered', () => {
+    expect(selectNetworkId('network-public', ['network-private'])).toBe(
+      'network-private',
+    );
+  });
+
+  it('selects the first allowed network when nothing is selected yet', () => {
+    expect(selectNetworkId('', ['network-private'])).toBe('network-private');
+  });
+
+  it('selects nothing when no network is allowed', () => {
+    expect(selectNetworkId('network-public', [])).toBe('');
   });
 });

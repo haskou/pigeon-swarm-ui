@@ -50,4 +50,13 @@ describe(NetworkMapper.name, () => {
       status: 'attached',
     });
   });
+
+  it('leaves the privateNetwork flag absent when the node resource omits it', () => {
+    const network = mapper.toAggregate({
+      id: 'network-a',
+      name: 'Builders',
+    });
+
+    expect(network.toPrimitives().privateNetwork).toBeUndefined();
+  });
 });

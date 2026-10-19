@@ -96,6 +96,37 @@ describe(PigeonNetworksFacade.name, () => {
     ]);
   });
 
+  it('leaves the privateNetwork flag absent when the node does not send it', async () => {
+    networkSearcher.search.mockResolvedValue([
+      Network.fromPrimitives({
+        id: 'network-c',
+        key: undefined,
+        name: 'Unflagged',
+        status: 'attached',
+      }),
+    ]);
+
+    const [network] = await facade.list();
+
+    expect(network?.privateNetwork).toBeUndefined();
+  });
+
+  it('maps an explicit public flag onto the view model', async () => {
+    networkSearcher.search.mockResolvedValue([
+      Network.fromPrimitives({
+        id: 'network-d',
+        key: undefined,
+        name: 'Open',
+        privateNetwork: false,
+        status: 'attached',
+      }),
+    ]);
+
+    await expect(facade.list()).resolves.toEqual([
+      { id: 'network-d', name: 'Open', privateNetwork: false },
+    ]);
+  });
+
   it('delegates public-network creation without inventing an application message', async () => {
     await facade.createPublic();
 

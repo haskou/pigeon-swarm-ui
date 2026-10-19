@@ -23,7 +23,11 @@ import { GlassSelect } from '../../../../shared/presentation/components/glassSel
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
-import { allowedNetworkIds } from '../../../networks/presentation/view-models/nodeNetworkVisibility';
+import {
+  allowedNetworkIds,
+  selectNetworkId,
+} from '../../../networks/presentation/view-models/nodeNetworkVisibility';
+import { canSubmitCommunity } from '../view-models/canSubmitCommunity';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 
 const ImageCropEditor = lazy(() =>
@@ -116,17 +120,18 @@ export function CreateCommunityDialog({
       networkOptions.length === 0)
       ? privateNetworkHelp
       : copy.communities.networkCreateHelp;
-  const canSubmit =
-    name.trim().length > 0 &&
-    channels.length > 0 &&
-    channels.every((channel) => channelNameIsValid(channel.name)) &&
-    channelNamesAreUnique(channels) &&
-    networkId.length > 0 &&
-    !(
-      visibility === 'private' &&
-      (nodeNetworksLoading || nodeNetworksLoadError)
-    ) &&
-    state !== 'loading';
+  const canSubmit = canSubmitCommunity({
+    busy: state === 'loading',
+    channelsValid:
+      channels.length > 0 &&
+      channels.every((channel) => channelNameIsValid(channel.name)) &&
+      channelNamesAreUnique(channels),
+    hasName: name.trim().length > 0,
+    hasNetwork: networkId.length > 0,
+    networksFailed: nodeNetworksLoadError,
+    networksLoading: nodeNetworksLoading,
+    visibility,
+  });
 
   useEffect(() => {
     if (!avatar) {
@@ -157,11 +162,12 @@ export function CreateCommunityDialog({
   }, [banner]);
 
   useEffect(() => {
-    if (networkOptions.some((option) => option.value === networkId)) {
-      return;
-    }
+    const next = selectNetworkId(
+      networkId,
+      networkOptions.map((option) => option.value),
+    );
 
-    setNetworkId(networkOptions[0]?.value ?? '');
+    if (next !== networkId) setNetworkId(next);
   }, [networkId, networkOptions]);
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {

@@ -50,6 +50,8 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
       setNetworks(list.networks);
       setNetworksError(list.failed);
     } catch (caught) {
+      setNetworks([]);
+      setNetworksError(true);
       setError(new Error(toUserErrorMessage(caught, copy.nodeSettings.error)));
     } finally {
       setLoading(false);
