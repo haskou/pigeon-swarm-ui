@@ -13,6 +13,7 @@ import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
+import { KeychainHeadUnavailableError } from './errors/KeychainHeadUnavailableError';
 
 const remoteKeychainCacheTtlMs = 1500;
 
@@ -195,6 +196,13 @@ export class PigeonKeychainApi {
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     return await this.enqueuePublish(session.identity.id, async () => {
       const head = await this.readPublishHead(session);
+
+      // A pointer proves a keychain exists. A head still missing after the lag
+      // window is not absence: a root posted without a previous link would sit
+      // beside the existing keychain, so the publish is refused instead.
+      if (!head && session.keychainExternalIdentifier) {
+        throw new KeychainHeadUnavailableError();
+      }
 
       return await this.postKeychain(
         session,
