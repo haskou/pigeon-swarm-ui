@@ -281,6 +281,7 @@ function CreateDialogs(
           conversations={props.conversations}
           nodeNetworks={props.nodeNetworks}
           nodeNetworksLoading={props.nodeNetworksLoading}
+          nodeNetworksLoadError={props.nodeNetworksLoadError}
           session={props.session}
           onClose={props.onCloseConversation}
           onCreated={props.onConversationCreated}
@@ -305,6 +306,7 @@ function CreateDialogs(
           headerControl={modeControl}
           nodeNetworks={props.nodeNetworks}
           nodeNetworksLoading={props.nodeNetworksLoading}
+          nodeNetworksLoadError={props.nodeNetworksLoadError}
           session={props.session}
           onClose={props.onCloseCommunity}
           onCreated={props.onCommunityCreated}

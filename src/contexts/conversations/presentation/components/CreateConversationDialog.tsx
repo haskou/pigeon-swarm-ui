@@ -50,6 +50,7 @@ interface CreateConversationDialogProps {
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
   nodeNetworksLoading: boolean;
+  nodeNetworksLoadError: boolean;
   session: Session;
   onClose: () => void;
   onCreated: (session: Session, conversation: ConversationResource) => void;
@@ -59,6 +60,7 @@ export function CreateConversationDialog({
   conversations,
   nodeNetworks,
   nodeNetworksLoading,
+  nodeNetworksLoadError,
   onClose,
   onCreated,
   session,
@@ -152,12 +154,14 @@ export function CreateConversationDialog({
   const canSubmitDirect =
     !!peerIdentity &&
     !nodeNetworksLoading &&
+    !nodeNetworksLoadError &&
     !!selectedNetworkId &&
     !existingDirectConversation &&
     state !== 'loading' &&
     !contactKeyBlocked(peerContact, peerContactAcknowledged);
   const canSubmitGroup =
     !nodeNetworksLoading &&
+    !nodeNetworksLoadError &&
     groupName.trim().length > 0 &&
     groupParticipants.length > 0 &&
     !!groupNetworkId &&
@@ -331,7 +335,7 @@ export function CreateConversationDialog({
       return;
     }
 
-    if (nodeNetworksLoading) return;
+    if (nodeNetworksLoading || nodeNetworksLoadError) return;
 
     if (!selectedNetworkId) {
       setError(copy.dialog.noSharedPrivateNetwork);
@@ -486,6 +490,7 @@ export function CreateConversationDialog({
                   </div>
                 ) : null}
                 {!nodeNetworksLoading &&
+                !nodeNetworksLoadError &&
                 peerIdentity &&
                 lookupState === 'ready' &&
                 sharedNetworkIds.length === 0 ? (
@@ -622,6 +627,7 @@ export function CreateConversationDialog({
 
               {groupParticipants.length > 0 &&
                 !nodeNetworksLoading &&
+                !nodeNetworksLoadError &&
                 groupSharedNetworkIds.length === 0 && (
                   <div className="ui-inline-notice border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
                     {copy.dialog.noSharedPrivateGroupNetwork}
@@ -646,6 +652,11 @@ export function CreateConversationDialog({
           {nodeNetworksLoading && (
             <div className="ui-inline-notice mt-4 border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
               {copy.dialog.networksLoading}
+            </div>
+          )}
+          {nodeNetworksLoadError && (
+            <div className="ui-inline-notice mt-4 border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
+              {copy.nodeSettings.error}
             </div>
           )}
 

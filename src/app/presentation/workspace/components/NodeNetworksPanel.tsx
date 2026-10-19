@@ -9,7 +9,7 @@ import type { NetworkMutation } from './NetworkMutation';
 import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { NetworkInvite } from '../../../../contexts/networks/domain/NetworkInvite';
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
-import { isPublicNodeNetwork } from '../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
+import { isPrivateNodeNetwork } from '../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
@@ -156,6 +156,7 @@ function NetworkRow({
   network,
   onCopy,
   onRemove,
+  publicNetwork,
   technicalDetailsVisible,
 }: {
   canRemove: boolean;
@@ -163,12 +164,11 @@ function NetworkRow({
   copied: boolean;
   disabled: boolean;
   network: NodeNetwork;
+  publicNetwork: boolean;
   onCopy: (network: NodeNetwork) => Promise<void>;
   onRemove: (network: NodeNetwork) => Promise<void>;
   technicalDetailsVisible: boolean;
 }) {
-  const publicNetwork = isPublicNodeNetwork(network);
-
   return (
     <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -256,6 +256,7 @@ function NetworkList({
             <NetworkRow
               canRemove={canRemoveNetworks}
               canShareKey={isOwner && !!network.key}
+              publicNetwork={isOwner && !isPrivateNodeNetwork(network)}
               copied={copiedNetworkId === network.id}
               disabled={loading !== null}
               key={network.id}
@@ -511,7 +512,8 @@ export function NodeNetworksPanel({
     node?.owner ?? undefined,
     session.identity.id,
   );
-  const hasPublicNetwork = networks.some(isPublicNodeNetwork);
+  const hasPublicNetwork =
+    isOwner && networks.some((network) => !isPrivateNodeNetwork(network));
   const canManageNetworks = !!node && (!node.owner || isOwner);
   const canCreatePublicNetwork = canManageNetworks && !hasPublicNetwork;
   const canJoinNetwork = isNetworkInviteCode(joinCode);
@@ -589,7 +591,7 @@ export function NodeNetworksPanel({
     const confirmed = window.confirm(
       copy.nodeSettings.removeNetworkConfirm.replace(
         '{name}',
-        isPublicNodeNetwork(network)
+        isOwner && !isPrivateNodeNetwork(network)
           ? copy.nodeSettings.publicNetworkName
           : network.name,
       ),

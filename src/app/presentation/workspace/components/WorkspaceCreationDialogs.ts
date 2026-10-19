@@ -10,6 +10,7 @@ export type WorkspaceCreationDialogs = {
   createConversationOpen: boolean;
   nodeNetworks: NodeNetwork[];
   nodeNetworksLoading: boolean;
+  nodeNetworksLoadError: boolean;
   onCloseCommunity: () => void;
   onCloseConversation: () => void;
   onCommunityCreated: (input: {

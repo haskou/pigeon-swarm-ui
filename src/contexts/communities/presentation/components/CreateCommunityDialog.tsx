@@ -38,6 +38,7 @@ interface CreateCommunityDialogProps {
   headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
   nodeNetworksLoading: boolean;
+  nodeNetworksLoadError: boolean;
   onClose: () => void;
   onCreated: (input: { community: Community; session: Session }) => void;
   session: Session;
@@ -55,6 +56,7 @@ export function CreateCommunityDialog({
   headerControl,
   nodeNetworks,
   nodeNetworksLoading,
+  nodeNetworksLoadError,
   onClose,
   onCreated,
   session,
@@ -102,12 +104,16 @@ export function CreateCommunityDialog({
     ? channelValidationError(channelName, channels)
     : null;
   const canAddChannel = channelName.trim().length > 0 && !channelInputError;
-  const privateNetworkHelp = nodeNetworksLoading
-    ? copy.dialog.networksLoading
-    : copy.communities.noPrivateNetwork;
+  const privateNetworkHelp = nodeNetworksLoadError
+    ? copy.nodeSettings.error
+    : nodeNetworksLoading
+      ? copy.dialog.networksLoading
+      : copy.communities.noPrivateNetwork;
   const networkHelp =
     visibility === 'private' &&
-    (nodeNetworksLoading || networkOptions.length === 0)
+    (nodeNetworksLoading ||
+      nodeNetworksLoadError ||
+      networkOptions.length === 0)
       ? privateNetworkHelp
       : copy.communities.networkCreateHelp;
   const canSubmit =
@@ -116,7 +122,10 @@ export function CreateCommunityDialog({
     channels.every((channel) => channelNameIsValid(channel.name)) &&
     channelNamesAreUnique(channels) &&
     networkId.length > 0 &&
-    !(visibility === 'private' && nodeNetworksLoading) &&
+    !(
+      visibility === 'private' &&
+      (nodeNetworksLoading || nodeNetworksLoadError)
+    ) &&
     state !== 'loading';
 
   useEffect(() => {
