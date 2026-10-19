@@ -212,6 +212,31 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       expect(onProgress).toHaveBeenCalledWith('node-starting');
     });
 
+    it('keeps the node-starting notice up until the conversation list finishes retrying', async () => {
+      const workspace = port();
+      workspace.loadKeychain.mockImplementation(
+        () =>
+          new Promise<KeychainResource | undefined>((resolve) => {
+            setTimeout(() => resolve(keychainResource), 500);
+          }),
+      );
+      workspace.listConversations
+        .mockRejectedValueOnce(notReady)
+        .mockRejectedValueOnce(notReady)
+        .mockResolvedValue(conversations);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+      const onProgress = jest.fn();
+
+      const pending = api.hydrate(session, onProgress);
+      // The keychain lands at 500ms while the list still waits for its third attempt at 750ms.
+      await jest.advanceTimersByTimeAsync(600);
+
+      expect(onProgress).toHaveBeenLastCalledWith('node-starting');
+
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(pending).resolves.toMatchObject({ conversations });
+    });
+
     it('does not retry failures other than 503020', async () => {
       const failure = new HttpJsonError(
         500,

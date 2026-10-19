@@ -85,7 +85,13 @@ export class PigeonIdentityWorkspaceSessionApi {
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
     onProgress?.('loading-keychain');
-    const conversationsPromise = this.listConversations(session, onProgress);
+    // Once the list has waited on the node, its notice must stay up until the
+    // last attempt, so the workspace step is not announced after that point.
+    let conversationsWaiting = false;
+    const conversationsPromise = this.listConversations(session, (step) => {
+      conversationsWaiting = true;
+      onProgress?.(step);
+    });
     // Handle a failed list now so it cannot go unhandled while the keychain
     // loads; the await below still rethrows it.
     void conversationsPromise.catch(() => undefined);
@@ -94,7 +100,9 @@ export class PigeonIdentityWorkspaceSessionApi {
     });
     const hydratedSession = this.hydrateKeychain(session, keychainResource);
 
-    onProgress?.('loading-workspace');
+    if (!conversationsWaiting) {
+      onProgress?.('loading-workspace');
+    }
 
     const conversations = await conversationsPromise;
 
