@@ -23,6 +23,7 @@ import { GlassSelect } from '../../../../shared/presentation/components/glassSel
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import { allowedNetworkIds } from '../../../networks/presentation/view-models/nodeNetworkVisibility';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 
 const ImageCropEditor = lazy(() =>
@@ -62,9 +63,7 @@ export function CreateCommunityDialog({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [networkId, setNetworkId] = useState(
-    session.identity.networks[0] ?? '',
-  );
+  const [networkId, setNetworkId] = useState('');
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
@@ -87,11 +86,15 @@ export function CreateCommunityDialog({
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const networkOptions = useMemo(
     () =>
-      session.identity.networks.map((id) => ({
+      allowedNetworkIds({
+        networkIds: session.identity.networks,
+        nodeNetworks,
+        privateOnly: visibility === 'private',
+      }).map((id) => ({
         label: nodeNetworks.find((network) => network.id === id)?.name ?? id,
         value: id,
       })),
-    [nodeNetworks, session.identity.networks],
+    [nodeNetworks, session.identity.networks, visibility],
   );
   const channelInputError = channelName.trim()
     ? channelValidationError(channelName, channels)
@@ -132,6 +135,14 @@ export function CreateCommunityDialog({
 
     return () => URL.revokeObjectURL(nextPreview);
   }, [banner]);
+
+  useEffect(() => {
+    if (networkOptions.some((option) => option.value === networkId)) {
+      return;
+    }
+
+    setNetworkId(networkOptions[0]?.value ?? '');
+  }, [networkId, networkOptions]);
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -326,7 +337,9 @@ export function CreateCommunityDialog({
                 />
               </label>
               <p className="mt-3 text-xs leading-relaxed text-white/45">
-                {copy.communities.networkCreateHelp}
+                {visibility === 'private' && networkOptions.length === 0
+                  ? copy.communities.noPrivateNetwork
+                  : copy.communities.networkCreateHelp}
               </p>
               <div className="mt-5">
                 <CommunityPublicSettingsPanel

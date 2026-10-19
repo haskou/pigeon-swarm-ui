@@ -614,6 +614,7 @@ export function GlassWorkspace({
     closeConversationCreation,
     closeSidebar,
     conversations,
+    nodeNetworks,
     rememberIdentity,
     session,
     sessionRef,

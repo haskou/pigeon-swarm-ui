@@ -29,6 +29,7 @@ import {
   identityPicture,
   publicFileObjectUrl,
 } from '../../../identities/presentation/view-models/identityDisplay';
+import { allowedNetworkIds } from '../../../networks/presentation/view-models/nodeNetworkVisibility';
 import { ConversationPeer } from '../view-models/ConversationPeer';
 import { GroupParticipantSelection } from '../view-models/GroupParticipantSelection';
 
@@ -90,13 +91,22 @@ export function CreateConversationDialog({
     useState<ContactKeyCheck | null>(null);
   const [groupIdentityAcknowledged, setGroupIdentityAcknowledged] =
     useState(false);
+  const directNetworkIds = useMemo(
+    () =>
+      allowedNetworkIds({
+        networkIds: session.identity.networks,
+        nodeNetworks,
+        privateOnly: true,
+      }),
+    [nodeNetworks, session.identity.networks],
+  );
   const sharedNetworkIds = useMemo(() => {
     if (!peerIdentity) return [];
 
-    return session.identity.networks.filter((networkId) =>
+    return directNetworkIds.filter((networkId) =>
       peerIdentity.networks.includes(networkId),
     );
-  }, [peerIdentity, session.identity.networks]);
+  }, [directNetworkIds, peerIdentity]);
   const groupSharedNetworkIds = useMemo(() => {
     if (groupParticipants.length === 0) return [];
 
@@ -106,7 +116,7 @@ export function CreateConversationDialog({
       ),
     );
   }, [groupParticipants, session.identity.networks]);
-  const networkOptions = session.identity.networks.map((networkId) => ({
+  const networkOptions = directNetworkIds.map((networkId) => ({
     disabled: peerIdentity ? !sharedNetworkIds.includes(networkId) : true,
     label:
       nodeNetworks.find((network) => network.id === networkId)?.name ??
@@ -185,12 +195,7 @@ export function CreateConversationDialog({
         .then((identity) => {
           if (cancelled) return;
 
-          const sharedNetworks = session.identity.networks.filter((networkId) =>
-            identity.networks.includes(networkId),
-          );
-
           setPeerIdentity(identity);
-          setSelectedNetworkId(sharedNetworks[0] ?? '');
           setPeerContact(checkIdentityContact(session.identity.id, identity));
           setPeerContactAcknowledged(false);
           setLookupState('ready');
@@ -210,7 +215,7 @@ export function CreateConversationDialog({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [peerIdentityId, session.identity.id, session.identity.networks]);
+  }, [peerIdentityId, session.identity.id]);
 
   useEffect(() => {
     const identityLookup = normalizeIdentityLookup(groupIdentityInput);
@@ -266,6 +271,14 @@ export function CreateConversationDialog({
     setGroupNetworkId(groupSharedNetworkIds[0] ?? '');
   }, [groupNetworkId, groupSharedNetworkIds]);
 
+  useEffect(() => {
+    if (selectedNetworkId && sharedNetworkIds.includes(selectedNetworkId)) {
+      return;
+    }
+
+    setSelectedNetworkId(sharedNetworkIds[0] ?? '');
+  }, [selectedNetworkId, sharedNetworkIds]);
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -315,7 +328,7 @@ export function CreateConversationDialog({
     }
 
     if (!selectedNetworkId) {
-      setError(copy.dialog.noSharedNetwork);
+      setError(copy.dialog.noSharedPrivateNetwork);
 
       return;
     }
@@ -470,7 +483,7 @@ export function CreateConversationDialog({
                 lookupState === 'ready' &&
                 sharedNetworkIds.length === 0 ? (
                   <div className="border-l-2 border-amber-300/50 pl-3 text-sm text-amber-100">
-                    {copy.dialog.noSharedNetwork}
+                    {copy.dialog.noSharedPrivateNetwork}
                   </div>
                 ) : null}
               </div>

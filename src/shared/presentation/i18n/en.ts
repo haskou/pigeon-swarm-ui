@@ -569,6 +569,8 @@ export const en = {
     noMatchingMembers: 'No members match that search.',
     noMembershipRequests: 'No invitations or join requests yet.',
     noModerationLogs: 'No moderation logs yet.',
+    noPrivateNetwork:
+      'No private network is available. Private communities can only be created inside a private network.',
     openAvatar: 'Open community avatar',
     openBanner: 'Open community banner',
     owner: 'Owner',
@@ -787,6 +789,8 @@ export const en = {
     loadingIdentity: 'Looking up identity...',
     noSharedNetwork:
       'No shared network with this identity. You cannot create this conversation yet.',
+    noSharedPrivateNetwork:
+      'No shared private network with this identity. Direct conversations can only use private networks.',
     remoteIdentityFound: 'User found.',
     remoteIdentityHelp: identityLookup.help,
     remoteIdentityId: identityLookup.label,
@@ -960,6 +964,8 @@ export const en = {
       NotificationNotFoundError: 'That notification could not be found.',
       NotificationRecipientMismatchError:
         'This notification belongs to another identity.',
+      PrivateNetworkRequiredError:
+        'Direct conversations and private communities require a private network.',
       RemoteMessageCandidateMismatchError:
         'The remote message does not match the announced message.',
     },

@@ -576,6 +576,8 @@ export const es = {
     noMatchingMembers: 'Ningún miembro coincide con la búsqueda.',
     noMembershipRequests: 'Aún no hay invitaciones ni solicitudes.',
     noModerationLogs: 'Aún no hay registros de moderación.',
+    noPrivateNetwork:
+      'No hay una red privada disponible. Las comunidades privadas solo se pueden crear dentro de una red privada.',
     openAvatar: 'Abrir avatar de comunidad',
     openBanner: 'Abrir banner de comunidad',
     owner: 'Propietario',
@@ -796,6 +798,8 @@ export const es = {
     loadingIdentity: 'Buscando identidad...',
     noSharedNetwork:
       'No hay red compartida con esta identidad. Aún no puedes crear esta conversación.',
+    noSharedPrivateNetwork:
+      'No hay red privada compartida con esta identidad. Las conversaciones directas solo pueden usar redes privadas.',
     remoteIdentityFound: 'Usuario encontrado.',
     remoteIdentityHelp: identityLookup.help,
     remoteIdentityId: identityLookup.label,
@@ -969,6 +973,8 @@ export const es = {
       NotificationNotFoundError: 'No se encontró esa notificación.',
       NotificationRecipientMismatchError:
         'Esta notificación pertenece a otra identidad.',
+      PrivateNetworkRequiredError:
+        'Las conversaciones directas y las comunidades privadas requieren una red privada.',
       RemoteMessageCandidateMismatchError:
         'El mensaje remoto no coincide con el mensaje anunciado.',
     },

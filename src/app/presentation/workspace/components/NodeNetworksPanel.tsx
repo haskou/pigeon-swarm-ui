@@ -9,6 +9,7 @@ import type { NetworkMutation } from './NetworkMutation';
 import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { NetworkInvite } from '../../../../contexts/networks/domain/NetworkInvite';
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
+import { isPublicNodeNetwork } from '../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
@@ -20,12 +21,6 @@ interface NodeNetworksPanelProps {
   node: (NodeInfo & { owner: null | string }) | null;
   onNetworksUpdated: () => Promise<void>;
   session: Session;
-}
-
-function isPublicNodeNetwork(network: NodeNetwork): boolean {
-  const name = network.name.trim().toLowerCase();
-
-  return name === 'public' || name === 'public network';
 }
 
 function isNetworkInviteCode(value: string): boolean {

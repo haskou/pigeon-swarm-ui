@@ -7,10 +7,12 @@ import type { ConversationResource } from '../../../../contexts/conversations/in
 import type { IdentityResource } from '../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { ConversationKeyEntry } from '../../../../contexts/identities/infrastructure/keychain/ConversationKeyEntry';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
+import type { NodeNetwork } from '../../../../contexts/networks/presentation/view-models/NodeNetwork';
 import type { WorkspaceConversationNavigation } from './WorkspaceConversationNavigation';
 
 import { ConversationTimeline } from '../../../../contexts/conversations/presentation/view-models/ConversationTimeline';
 import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
+import { allowedNetworkIds } from '../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { applicationContainer } from '../../../composition/applicationContainer';
 import { applyPublishedKeychain } from './applyPublishedKeychain';
@@ -31,6 +33,7 @@ type WorkspaceConversationNavigationInput = {
   closeConversationCreation: () => void;
   closeSidebar: () => void;
   conversations: ConversationResource[];
+  nodeNetworks: NodeNetwork[];
   rememberIdentity: (identity: IdentityResource) => void;
   session: Session;
   sessionRef: MutableRefObject<Session>;
@@ -45,6 +48,7 @@ export function useWorkspaceConversationNavigation({
   closeConversationCreation,
   closeSidebar,
   conversations,
+  nodeNetworks,
   rememberIdentity,
   session,
   sessionRef,
@@ -99,13 +103,17 @@ export function useWorkspaceConversationNavigation({
       }
 
       const sharedNetwork = WorkspaceConversationTarget.sharedNetwork(
-        session.identity.networks,
+        allowedNetworkIds({
+          networkIds: session.identity.networks,
+          nodeNetworks,
+          privateOnly: true,
+        }),
         identity,
         preferredNetworkId,
       );
 
       if (NullObject.isNullObject(sharedNetwork)) {
-        throw new Error(copy.dialog.noSharedNetwork);
+        throw new Error(copy.dialog.noSharedPrivateNetwork);
       }
 
       const publishingSession = sessionRef.current;
@@ -132,6 +140,7 @@ export function useWorkspaceConversationNavigation({
       closeCommunityMembers,
       closeSidebar,
       conversations,
+      nodeNetworks,
       rememberIdentity,
       session.identity.id,
       session.identity.networks,
