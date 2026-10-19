@@ -45,6 +45,7 @@ import { DeviceRemovedNotice } from './DeviceRemovedNotice';
 import { Field } from './Field';
 import { LoginIdentityPreview } from './LoginIdentityPreview';
 import { type LoginMethod, LoginMethodPanel } from './LoginMethodPanel';
+import { LoginNodeStartingNotice } from './LoginNodeStartingNotice';
 import { NodeLoginSummary } from './NodeLoginSummary';
 import { PasswordRequirementProgress } from './PasswordRequirementProgress';
 
@@ -616,15 +617,7 @@ export function AuthScreen({
                 ? copy.auth.loginSubmit
                 : copy.auth.createIdentity}
           </button>
-          {mode === 'login' && loginProgressStep === 'node-starting' && (
-            <p
-              className="mt-2 text-center text-xs leading-snug text-white/70"
-              data-testid="auth-node-starting"
-              role="status"
-            >
-              {copy.auth.loginProgress.nodeStartingHelp}
-            </p>
-          )}
+          <LoginNodeStartingNotice mode={mode} step={loginProgressStep} />
           {mode === 'login' && (
             <p className="mt-2 text-center text-xs leading-snug text-white/45">
               {copy.auth.loginSubmitHelp}
