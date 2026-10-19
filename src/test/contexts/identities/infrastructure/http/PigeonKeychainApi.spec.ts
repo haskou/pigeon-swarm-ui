@@ -499,6 +499,83 @@ describe(PigeonKeychainApi.name, () => {
       expect(request).toHaveBeenCalledTimes(2);
       expect(server.headConversationIds()).toEqual(['conversation-a']);
     });
+
+    it('fails the publish instead of posting a root when the session holds a pointer and the head stays missing', async () => {
+      const request = jest.fn((_path: string, init: { method: string }) => {
+        if (init.method === 'GET') {
+          return Promise.reject(lagError());
+        }
+
+        return Promise.resolve({
+          keychainExternalIdentifier: 'kc-2',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        });
+      });
+      const session = {
+        ...signingSession,
+        keychain: emptyKeychain,
+        keychainExternalIdentifier: 'kc-1',
+      } as unknown as Session;
+      const outcome = expect(
+        apiFor(request, new KeychainCipher()).publishKeychain(
+          session,
+          (current) => ({
+            ...current,
+            conversations: {
+              'conversation-a': {
+                conversationId: 'conversation-a',
+              } as ConversationKeyEntry,
+            },
+          }),
+        ),
+      ).rejects.toMatchObject({ name: 'KeychainHeadUnavailableError' });
+
+      await jest.runAllTimersAsync();
+
+      await outcome;
+      expect(
+        request.mock.calls.filter(([, init]) => init.method === 'POST'),
+      ).toHaveLength(0);
+    });
+
+    it('fails the publish with the node 503020 when the session holds a pointer and the node is still opening', async () => {
+      const request = jest.fn((_path: string, init: { method: string }) => {
+        if (init.method === 'GET') {
+          return Promise.reject(
+            new HttpJsonError(
+              503,
+              'Service Unavailable',
+              JSON.stringify({ code: 503020 }),
+            ),
+          );
+        }
+
+        return Promise.resolve({
+          keychainExternalIdentifier: 'kc-2',
+          ownerIdentityId: 'identity-1',
+          version: 1,
+        });
+      });
+      const session = {
+        ...signingSession,
+        keychain: emptyKeychain,
+        keychainExternalIdentifier: 'kc-1',
+      } as unknown as Session;
+      const outcome = expect(
+        apiFor(request, new KeychainCipher()).publishKeychain(
+          session,
+          (current) => current,
+        ),
+      ).rejects.toMatchObject({ code: 503020 });
+
+      await jest.runAllTimersAsync();
+
+      await outcome;
+      expect(
+        request.mock.calls.filter(([, init]) => init.method === 'POST'),
+      ).toHaveLength(0);
+    });
   });
 
   describe('device-sealed root head', () => {
