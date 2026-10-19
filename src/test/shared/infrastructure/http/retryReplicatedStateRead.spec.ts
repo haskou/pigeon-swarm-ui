@@ -83,7 +83,7 @@ describe(retryReplicatedStateRead.name, () => {
     expect(onNotReady).toHaveBeenCalledTimes(8);
   });
 
-  it('pins the retry triggers: 503020 codes and isPending values, over a 15.75s schedule', () => {
+  it('pins the retry codes and the 15.75s schedule', () => {
     expect([...replicatedStateNotReadyCodes]).toEqual(['503020']);
     expect(
       replicatedStateRetryDelaysMs.reduce((total, delay) => total + delay, 0),
