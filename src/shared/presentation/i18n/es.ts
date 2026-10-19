@@ -796,8 +796,10 @@ export const es = {
     groupParticipant: identityLookup.label,
     groupParticipants: 'Participantes',
     loadingIdentity: 'Buscando identidad...',
-    noSharedNetwork:
-      'No hay red compartida con esta identidad. Aún no puedes crear esta conversación.',
+    networksLoading:
+      'Cargando redes. Se necesita una red privada para crear esto.',
+    noSharedPrivateGroupNetwork:
+      'Ninguna red privada es compartida por todos los participantes. Las conversaciones grupales solo pueden usar redes privadas.',
     noSharedPrivateNetwork:
       'No hay red privada compartida con esta identidad. Las conversaciones directas solo pueden usar redes privadas.',
     remoteIdentityFound: 'Usuario encontrado.',

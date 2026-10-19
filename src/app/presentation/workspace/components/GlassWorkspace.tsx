@@ -97,6 +97,7 @@ interface GlassWorkspaceProps {
   communitiesLoading: boolean;
   node: (NodeInfo & { owner: null | string }) | null;
   nodeNetworks: NodeNetwork[];
+  nodeNetworksLoading: boolean;
   onCommunitiesReload: () => Promise<void>;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
@@ -115,6 +116,7 @@ export function GlassWorkspace({
   conversations,
   node,
   nodeNetworks,
+  nodeNetworksLoading,
   onCommunitiesReload,
   onNodeNetworksReload,
   onPeersReload,
@@ -615,6 +617,7 @@ export function GlassWorkspace({
     closeSidebar,
     conversations,
     nodeNetworks,
+    nodeNetworksLoading,
     rememberIdentity,
     session,
     sessionRef,
@@ -1268,6 +1271,7 @@ export function GlassWorkspace({
               createCommunityOpen: isCreateCommunityOpen,
               createConversationOpen: isCreateOpen,
               nodeNetworks,
+              nodeNetworksLoading,
               onCloseCommunity: () =>
                 closeTransientSurface('community-creation'),
               onCloseConversation: () =>

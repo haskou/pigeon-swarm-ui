@@ -185,6 +185,7 @@ function App(): ReactElement {
             session={session}
             node={nodeNetworks.node}
             nodeNetworks={nodeNetworks.networks}
+            nodeNetworksLoading={nodeNetworks.loading}
             onNodeNetworksReload={nodeNetworks.reload}
             onPeersReload={peers.reload}
             peersLoading={peers.loading}

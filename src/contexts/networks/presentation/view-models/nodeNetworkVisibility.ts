@@ -10,11 +10,11 @@ export function isPublicNodeNetwork(network: NodeNetwork): boolean {
 }
 
 /**
- * Network ids a direct conversation or a private community may use. The node
- * refuses both on the public network, so `privateOnly` drops it; callers must
- * not fall back to it. A network the node list does not describe is kept, as
- * nothing marks it as public, and the node still enforces the rule. Public
- * communities keep every network.
+ * Network ids a direct conversation or a private community may use. Private
+ * placement needs a positive match: the id must be in the node list and must
+ * not be identified as the public network. An empty or not-yet-loaded node
+ * list therefore places nothing, and callers must never fall back to the
+ * public network. Public communities keep every identity network.
  */
 export function allowedNetworkIds({
   networkIds,
@@ -27,9 +27,11 @@ export function allowedNetworkIds({
 }): string[] {
   if (!privateOnly) return networkIds;
 
-  const publicIds = new Set(
-    nodeNetworks.filter(isPublicNodeNetwork).map((network) => network.id),
+  const privateIds = new Set(
+    nodeNetworks
+      .filter((network) => !isPublicNodeNetwork(network))
+      .map((network) => network.id),
   );
 
-  return networkIds.filter((networkId) => !publicIds.has(networkId));
+  return networkIds.filter((networkId) => privateIds.has(networkId));
 }

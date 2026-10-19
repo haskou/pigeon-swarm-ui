@@ -34,6 +34,7 @@ type WorkspaceConversationNavigationInput = {
   closeSidebar: () => void;
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
+  nodeNetworksLoading: boolean;
   rememberIdentity: (identity: IdentityResource) => void;
   session: Session;
   sessionRef: MutableRefObject<Session>;
@@ -49,6 +50,7 @@ export function useWorkspaceConversationNavigation({
   closeSidebar,
   conversations,
   nodeNetworks,
+  nodeNetworksLoading,
   rememberIdentity,
   session,
   sessionRef,
@@ -113,7 +115,11 @@ export function useWorkspaceConversationNavigation({
       );
 
       if (NullObject.isNullObject(sharedNetwork)) {
-        throw new Error(copy.dialog.noSharedPrivateNetwork);
+        throw new Error(
+          nodeNetworksLoading
+            ? copy.dialog.networksLoading
+            : copy.dialog.noSharedPrivateNetwork,
+        );
       }
 
       const publishingSession = sessionRef.current;
@@ -141,6 +147,7 @@ export function useWorkspaceConversationNavigation({
       closeSidebar,
       conversations,
       nodeNetworks,
+      nodeNetworksLoading,
       rememberIdentity,
       session.identity.id,
       session.identity.networks,

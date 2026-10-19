@@ -56,13 +56,33 @@ describe(allowedNetworkIds.name, () => {
     ).toEqual([]);
   });
 
-  it('keeps identity networks that the node list does not describe', () => {
+  it('drops identity networks the node list does not describe', () => {
     expect(
       allowedNetworkIds({
         networkIds: ['network-unknown'],
         nodeNetworks,
         privateOnly: true,
       }),
-    ).toEqual(['network-unknown']);
+    ).toEqual([]);
+  });
+
+  it('places no network while the node list is empty or not loaded', () => {
+    expect(
+      allowedNetworkIds({
+        networkIds: ['network-private'],
+        nodeNetworks: [],
+        privateOnly: true,
+      }),
+    ).toEqual([]);
+  });
+
+  it('keeps every network for public communities when the node list is empty', () => {
+    expect(
+      allowedNetworkIds({
+        networkIds: ['network-private'],
+        nodeNetworks: [],
+        privateOnly: false,
+      }),
+    ).toEqual(['network-private']);
   });
 });

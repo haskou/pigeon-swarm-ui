@@ -37,6 +37,7 @@ const ImageCropEditor = lazy(() =>
 interface CreateCommunityDialogProps {
   headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
+  nodeNetworksLoading: boolean;
   onClose: () => void;
   onCreated: (input: { community: Community; session: Session }) => void;
   session: Session;
@@ -53,6 +54,7 @@ const channelNamePattern = /^[a-z0-9][a-z0-9_-]*$/;
 export function CreateCommunityDialog({
   headerControl,
   nodeNetworks,
+  nodeNetworksLoading,
   onClose,
   onCreated,
   session,
@@ -100,12 +102,21 @@ export function CreateCommunityDialog({
     ? channelValidationError(channelName, channels)
     : null;
   const canAddChannel = channelName.trim().length > 0 && !channelInputError;
+  const privateNetworkHelp = nodeNetworksLoading
+    ? copy.dialog.networksLoading
+    : copy.communities.noPrivateNetwork;
+  const networkHelp =
+    visibility === 'private' &&
+    (nodeNetworksLoading || networkOptions.length === 0)
+      ? privateNetworkHelp
+      : copy.communities.networkCreateHelp;
   const canSubmit =
     name.trim().length > 0 &&
     channels.length > 0 &&
     channels.every((channel) => channelNameIsValid(channel.name)) &&
     channelNamesAreUnique(channels) &&
     networkId.length > 0 &&
+    !(visibility === 'private' && nodeNetworksLoading) &&
     state !== 'loading';
 
   useEffect(() => {
@@ -337,9 +348,7 @@ export function CreateCommunityDialog({
                 />
               </label>
               <p className="mt-3 text-xs leading-relaxed text-white/45">
-                {visibility === 'private' && networkOptions.length === 0
-                  ? copy.communities.noPrivateNetwork
-                  : copy.communities.networkCreateHelp}
+                {networkHelp}
               </p>
               <div className="mt-5">
                 <CommunityPublicSettingsPanel

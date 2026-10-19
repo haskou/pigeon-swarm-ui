@@ -49,6 +49,7 @@ type SelectedIdentity = {
 interface CreateConversationDialogProps {
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
+  nodeNetworksLoading: boolean;
   session: Session;
   onClose: () => void;
   onCreated: (session: Session, conversation: ConversationResource) => void;
@@ -57,6 +58,7 @@ interface CreateConversationDialogProps {
 export function CreateConversationDialog({
   conversations,
   nodeNetworks,
+  nodeNetworksLoading,
   onClose,
   onCreated,
   session,
@@ -91,7 +93,7 @@ export function CreateConversationDialog({
     useState<ContactKeyCheck | null>(null);
   const [groupIdentityAcknowledged, setGroupIdentityAcknowledged] =
     useState(false);
-  const directNetworkIds = useMemo(
+  const privateNetworkIds = useMemo(
     () =>
       allowedNetworkIds({
         networkIds: session.identity.networks,
@@ -103,27 +105,27 @@ export function CreateConversationDialog({
   const sharedNetworkIds = useMemo(() => {
     if (!peerIdentity) return [];
 
-    return directNetworkIds.filter((networkId) =>
+    return privateNetworkIds.filter((networkId) =>
       peerIdentity.networks.includes(networkId),
     );
-  }, [directNetworkIds, peerIdentity]);
+  }, [peerIdentity, privateNetworkIds]);
   const groupSharedNetworkIds = useMemo(() => {
     if (groupParticipants.length === 0) return [];
 
-    return session.identity.networks.filter((networkId) =>
+    return privateNetworkIds.filter((networkId) =>
       groupParticipants.every(({ identity }) =>
         identity.networks.includes(networkId),
       ),
     );
-  }, [groupParticipants, session.identity.networks]);
-  const networkOptions = directNetworkIds.map((networkId) => ({
+  }, [groupParticipants, privateNetworkIds]);
+  const networkOptions = privateNetworkIds.map((networkId) => ({
     disabled: peerIdentity ? !sharedNetworkIds.includes(networkId) : true,
     label:
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       networkId,
     value: networkId,
   }));
-  const groupNetworkOptions = session.identity.networks.map((networkId) => ({
+  const groupNetworkOptions = privateNetworkIds.map((networkId) => ({
     disabled:
       groupParticipants.length === 0 ||
       !groupSharedNetworkIds.includes(networkId),
@@ -149,11 +151,13 @@ export function CreateConversationDialog({
   }, [conversations, peerIdentity, session.identity.id, session.keychain]);
   const canSubmitDirect =
     !!peerIdentity &&
+    !nodeNetworksLoading &&
     !!selectedNetworkId &&
     !existingDirectConversation &&
     state !== 'loading' &&
     !contactKeyBlocked(peerContact, peerContactAcknowledged);
   const canSubmitGroup =
+    !nodeNetworksLoading &&
     groupName.trim().length > 0 &&
     groupParticipants.length > 0 &&
     !!groupNetworkId &&
@@ -327,6 +331,8 @@ export function CreateConversationDialog({
       return;
     }
 
+    if (nodeNetworksLoading) return;
+
     if (!selectedNetworkId) {
       setError(copy.dialog.noSharedPrivateNetwork);
 
@@ -479,7 +485,8 @@ export function CreateConversationDialog({
                     {copy.dialog.directConversationAlreadyExists}
                   </div>
                 ) : null}
-                {peerIdentity &&
+                {!nodeNetworksLoading &&
+                peerIdentity &&
                 lookupState === 'ready' &&
                 sharedNetworkIds.length === 0 ? (
                   <div className="border-l-2 border-amber-300/50 pl-3 text-sm text-amber-100">
@@ -614,9 +621,10 @@ export function CreateConversationDialog({
               </div>
 
               {groupParticipants.length > 0 &&
+                !nodeNetworksLoading &&
                 groupSharedNetworkIds.length === 0 && (
                   <div className="ui-inline-notice border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
-                    {copy.dialog.noSharedNetwork}
+                    {copy.dialog.noSharedPrivateGroupNetwork}
                   </div>
                 )}
 
@@ -632,6 +640,12 @@ export function CreateConversationDialog({
                   options={groupNetworkOptions}
                 />
               </Field>
+            </div>
+          )}
+
+          {nodeNetworksLoading && (
+            <div className="ui-inline-notice mt-4 border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
+              {copy.dialog.networksLoading}
             </div>
           )}
 

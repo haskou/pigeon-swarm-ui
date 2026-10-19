@@ -787,8 +787,10 @@ export const en = {
     groupParticipant: identityLookup.label,
     groupParticipants: 'Participants',
     loadingIdentity: 'Looking up identity...',
-    noSharedNetwork:
-      'No shared network with this identity. You cannot create this conversation yet.',
+    networksLoading:
+      'Loading networks. A private network is needed before you can create this.',
+    noSharedPrivateGroupNetwork:
+      'No private network is shared with every participant. Group conversations can only use private networks.',
     noSharedPrivateNetwork:
       'No shared private network with this identity. Direct conversations can only use private networks.',
     remoteIdentityFound: 'User found.',
