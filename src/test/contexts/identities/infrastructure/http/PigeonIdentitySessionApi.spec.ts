@@ -331,13 +331,24 @@ describe(PigeonIdentitySessionApi.name, () => {
       );
 
       jest.useFakeTimers();
-      const pending = sessionApi.unlock(currentIdentity.id, 'password');
+      const onProgress = jest.fn();
+      const pending = sessionApi.unlock(
+        currentIdentity.id,
+        'password',
+        onProgress,
+      );
       await jest.runAllTimersAsync();
 
       await expect(pending).resolves.toMatchObject({
         deviceCredentialKeyPair: pairedCredential,
       });
       expect(http.request).toHaveBeenCalledTimes(3);
+      expect(onProgress.mock.calls).toEqual([
+        ['resolving-identity'],
+        ['node-starting'],
+        ['node-starting'],
+        ['decrypting-keys'],
+      ]);
     });
 
     it('does not retry an identity lookup that fails for another reason', async () => {
@@ -363,6 +374,39 @@ describe(PigeonIdentitySessionApi.name, () => {
       await jest.runAllTimersAsync();
       await settled;
       expect(http.request).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports the not-ready error once the identity lookup exhausts its retry budget', async () => {
+      const http = {
+        request: jest
+          .fn()
+          .mockRejectedValue(
+            new HttpJsonError(
+              503,
+              'Service Unavailable',
+              JSON.stringify({ code: 503020 }),
+            ),
+          ),
+      } as unknown as HttpJsonClient;
+      const sessionApi = new PigeonIdentitySessionApi(
+        new PigeonIdentityGateway(http),
+        mock<DeviceIdentityVault>(),
+        {
+          synchronize: jest.fn(),
+        } as unknown as PigeonDeviceAuthorizationApi,
+        passthroughRoot,
+        passthroughRecovery,
+      );
+      const onProgress = jest.fn();
+
+      jest.useFakeTimers();
+      const settled = expect(
+        sessionApi.unlock('identity-1', 'password', onProgress),
+      ).rejects.toBeInstanceOf(HttpJsonError);
+      await jest.runAllTimersAsync();
+      await settled;
+      expect(http.request).toHaveBeenCalledTimes(9);
+      expect(onProgress).not.toHaveBeenCalledWith('decrypting-keys');
     });
   });
 

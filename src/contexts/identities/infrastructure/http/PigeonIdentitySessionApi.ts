@@ -140,6 +140,7 @@ export class PigeonIdentitySessionApi {
     onProgress?.('resolving-identity');
     const identity = await retryReplicatedStateRead(
       async () => await this.identities.get(identityId.trim()),
+      { onNotReady: () => onProgress?.('node-starting') },
     );
     onProgress?.('decrypting-keys');
 

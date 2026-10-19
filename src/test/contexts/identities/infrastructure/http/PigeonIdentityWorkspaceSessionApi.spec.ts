@@ -179,10 +179,10 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       const api = new PigeonIdentityWorkspaceSessionApi(workspace);
 
       const pending = api.hydrate(session).catch((caught: unknown) => caught);
-      await jest.advanceTimersByTimeAsync(10_000);
+      await jest.advanceTimersByTimeAsync(16_000);
 
       await expect(pending).resolves.toBe(notReady);
-      expect(workspace.listConversations).toHaveBeenCalledTimes(7);
+      expect(workspace.listConversations).toHaveBeenCalledTimes(9);
     });
 
     it('rejects a refresh once retries are exhausted', async () => {
@@ -191,9 +191,24 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       const api = new PigeonIdentityWorkspaceSessionApi(workspace);
 
       const pending = api.refresh(session).catch((caught: unknown) => caught);
-      await jest.advanceTimersByTimeAsync(10_000);
+      await jest.advanceTimersByTimeAsync(16_000);
 
       await expect(pending).resolves.toBe(notReady);
+    });
+
+    it('reports that the node is starting while sign-in waits on the conversation list', async () => {
+      const workspace = port();
+      workspace.listConversations
+        .mockRejectedValueOnce(notReady)
+        .mockResolvedValue(conversations);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+      const onProgress = jest.fn();
+
+      const pending = api.hydrate(session, onProgress);
+      await jest.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toMatchObject({ conversations });
+      expect(onProgress).toHaveBeenCalledWith('node-starting');
     });
 
     it('does not retry failures other than 503020', async () => {

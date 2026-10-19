@@ -275,11 +275,18 @@ describe(PigeonIdentitiesGateway.name, () => {
       login.hydrate.mockResolvedValue(hydrateResult);
 
       jest.useFakeTimers();
-      const pending = gateway.recover('identity-1', 'password', recoveryKey);
+      const onProgress = jest.fn();
+      const pending = gateway.recover(
+        'identity-1',
+        'password',
+        recoveryKey,
+        onProgress,
+      );
       await jest.runAllTimersAsync();
 
       await expect(pending).resolves.toBe(hydrateResult);
       expect(profile.get).toHaveBeenCalledTimes(3);
+      expect(onProgress).toHaveBeenCalledWith('node-starting');
     });
 
     it('refuses the recovery without hydrating when no fresh root opens', async () => {

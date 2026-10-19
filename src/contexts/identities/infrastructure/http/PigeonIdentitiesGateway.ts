@@ -65,6 +65,7 @@ export class PigeonIdentitiesGateway {
     onProgress?.('resolving-identity');
     const identity = await retryReplicatedStateRead(
       async () => await this.identityProfile.get(identityId),
+      { onNotReady: () => onProgress?.('node-starting') },
     );
     onProgress?.('decrypting-keys');
     const session = await this.deviceAuthorization.recover(
@@ -272,6 +273,7 @@ export class PigeonIdentitiesGateway {
     onProgress?.('resolving-identity');
     const identity = await retryReplicatedStateRead(
       async () => await this.identityProfile.get(identityId),
+      { onNotReady: () => onProgress?.('node-starting') },
     );
     onProgress?.('decrypting-keys');
     const paired = await this.deviceAuthorization.completePairing(

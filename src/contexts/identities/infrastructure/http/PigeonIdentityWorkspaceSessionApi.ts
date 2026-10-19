@@ -20,9 +20,11 @@ export class PigeonIdentityWorkspaceSessionApi {
 
   private async listConversations(
     session: Session,
+    onProgress?: LoginIdentityProgressReporter,
   ): Promise<ConversationResource[]> {
     return await retryReplicatedStateRead(
       async () => await this.workspace.listConversations(session),
+      { onNotReady: () => onProgress?.('node-starting') },
     );
   }
 
@@ -76,11 +78,13 @@ export class PigeonIdentityWorkspaceSessionApi {
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
     onProgress?.('loading-keychain');
-    const conversationsPromise = this.listConversations(session);
+    const conversationsPromise = this.listConversations(session, onProgress);
     // Handle a failed list now so it cannot go unhandled while the keychain
     // loads; the await below still rethrows it.
     void conversationsPromise.catch(() => undefined);
-    const keychainResource = await this.workspace.loadKeychain(session);
+    const keychainResource = await this.workspace.loadKeychain(session, {
+      onNotReady: () => onProgress?.('node-starting'),
+    });
     const hydratedSession = this.hydrateKeychain(session, keychainResource);
 
     onProgress?.('loading-workspace');

@@ -3,20 +3,30 @@ import { waitBeforeRetry } from './waitBeforeRetry';
 
 // The node answers 503020 while its replicated state is still opening after a
 // restart. That clears within seconds, so every read that can meet it shares
-// this schedule (about 10s in total) before the error is reported.
-const replicatedStateNotReadyCode = '503020';
-const replicatedStateRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
+// this one contract: only 503020 is retried, over a schedule that totals
+// 15.75s before the error is reported.
+export const replicatedStateNotReadyCodes: ReadonlySet<string> = new Set([
+  '503020',
+]);
+export const replicatedStateRetryDelaysMs: readonly number[] = [
+  250, 500, 1000, 2000, 3000, 3000, 3000, 3000,
+];
 
-type RetryReplicatedStateReadOptions<T> = {
+export type ReplicatedStateReadOptions = {
+  /** Called before each wait on a 503020 answer, so the caller can show it. */
+  onNotReady?: () => void;
+  signal?: AbortSignal;
+};
+
+type RetryReplicatedStateReadOptions<T> = ReplicatedStateReadOptions & {
   /** Marks a resolved value that is still pending and worth another read. */
   isPending?: (value: T) => boolean;
-  signal?: AbortSignal;
 };
 
 export function isReplicatedStateNotReady(caught: unknown): boolean {
   return (
     caught instanceof HttpJsonError &&
-    String(caught.code) === replicatedStateNotReadyCode
+    replicatedStateNotReadyCodes.has(String(caught.code))
   );
 }
 
@@ -44,6 +54,7 @@ export async function retryReplicatedStateRead<T>(
         throw caught;
       }
 
+      options.onNotReady?.();
       await waitBeforeRetry(retryDelayMs, options.signal);
       continue;
     }

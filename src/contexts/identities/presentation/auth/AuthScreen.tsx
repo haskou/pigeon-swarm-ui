@@ -616,6 +616,15 @@ export function AuthScreen({
                 ? copy.auth.loginSubmit
                 : copy.auth.createIdentity}
           </button>
+          {mode === 'login' && loginProgressStep === 'node-starting' && (
+            <p
+              className="mt-2 text-center text-xs leading-snug text-white/70"
+              data-testid="auth-node-starting"
+              role="status"
+            >
+              {copy.auth.loginProgress.nodeStartingHelp}
+            </p>
+          )}
           {mode === 'login' && (
             <p className="mt-2 text-center text-xs leading-snug text-white/45">
               {copy.auth.loginSubmitHelp}
@@ -708,6 +717,8 @@ function loginProgressLabel(step: LoginIdentityProgressStep): string {
       return copy.auth.loginProgress.loadingKeychain;
     case 'loading-workspace':
       return copy.auth.loginProgress.loadingWorkspace;
+    case 'node-starting':
+      return copy.auth.loginProgress.nodeStarting;
     case 'resolving-identity':
       return copy.auth.loginProgress.resolvingIdentity;
   }
