@@ -44,6 +44,7 @@ export class PigeonNetworksFacade {
       id: primitives.id,
       key: primitives.key,
       name: primitives.name,
+      privateNetwork: primitives.privateNetwork,
     };
   }
 

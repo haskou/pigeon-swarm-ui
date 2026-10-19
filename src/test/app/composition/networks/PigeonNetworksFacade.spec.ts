@@ -80,6 +80,22 @@ describe(PigeonNetworksFacade.name, () => {
     ]);
   });
 
+  it('maps the node privateNetwork flag onto the view model', async () => {
+    networkSearcher.search.mockResolvedValue([
+      Network.fromPrimitives({
+        id: 'network-b',
+        key: undefined,
+        name: 'Signed',
+        privateNetwork: true,
+        status: 'attached',
+      }),
+    ]);
+
+    await expect(facade.list()).resolves.toEqual([
+      { id: 'network-b', name: 'Signed', privateNetwork: true },
+    ]);
+  });
+
   it('delegates public-network creation without inventing an application message', async () => {
     await facade.createPublic();
 

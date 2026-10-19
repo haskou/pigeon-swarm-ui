@@ -2,66 +2,96 @@ import type { NodeNetwork } from '../../../../../contexts/networks/presentation/
 
 import { allowedNetworkIds } from '../../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
 
-const keyedTeam: NodeNetwork = {
+const ownerPrivate: NodeNetwork = {
   id: 'network-keyed',
   key: 'key-placeholder',
   name: 'Team',
+  privateNetwork: true,
 };
-const unkeyedPublic: NodeNetwork = { id: 'network-public', name: 'public' };
-const unkeyedTeam: NodeNetwork = { id: 'network-unkeyed', name: 'Team' };
-const emptyKeyTeam: NodeNetwork = {
-  id: 'network-empty-key',
-  key: '',
+const privateNamedPublic: NodeNetwork = {
+  id: 'network-named-public',
+  name: 'public',
+  privateNetwork: true,
+};
+const signedNonOwnerPrivate: NodeNetwork = {
+  id: 'network-private-no-key',
+  name: 'Team',
+  privateNetwork: true,
+};
+const publicNetwork: NodeNetwork = {
+  id: 'network-public',
+  name: 'public',
+  privateNetwork: false,
+};
+const publicWithKey: NodeNetwork = {
+  id: 'network-public-keyed',
+  key: 'key-placeholder',
+  name: 'Team',
+  privateNetwork: false,
+};
+const unflaggedKeyed: NodeNetwork = {
+  id: 'network-unflagged',
+  key: 'key-placeholder',
   name: 'Team',
 };
-const nodeNetworks = [keyedTeam, unkeyedPublic];
+const anonymousNetwork: NodeNetwork = { id: 'network-anonymous', name: 'Team' };
 
 describe(allowedNetworkIds.name, () => {
-  it('offers a network whose node entry carries a non-empty key, whatever its name', () => {
+  it('offers a network the node flags private, whatever its name', () => {
     expect(
       allowedNetworkIds({
-        networkIds: ['network-keyed'],
-        nodeNetworks,
+        networkIds: ['network-named-public', 'network-public'],
+        nodeNetworks: [privateNamedPublic, publicNetwork],
+        privateOnly: true,
+      }),
+    ).toEqual(['network-named-public']);
+  });
+
+  it('offers a private network to a signed non-owner that has the flag but no key', () => {
+    expect(
+      allowedNetworkIds({
+        networkIds: ['network-private-no-key'],
+        nodeNetworks: [signedNonOwnerPrivate],
+        privateOnly: true,
+      }),
+    ).toEqual(['network-private-no-key']);
+  });
+
+  it('offers the owner its keyed private network', () => {
+    expect(
+      allowedNetworkIds({
+        networkIds: ['network-keyed', 'network-public'],
+        nodeNetworks: [ownerPrivate, publicNetwork],
         privateOnly: true,
       }),
     ).toEqual(['network-keyed']);
   });
 
-  it('never offers a network named public that carries no key', () => {
+  it('never offers a network the node flags public, even when a key is present', () => {
     expect(
       allowedNetworkIds({
-        networkIds: ['network-public'],
-        nodeNetworks,
+        networkIds: ['network-public-keyed'],
+        nodeNetworks: [publicWithKey],
         privateOnly: true,
       }),
     ).toEqual([]);
   });
 
-  it('never offers a network without a key, whatever its name', () => {
+  it('never offers a network without the private flag, whatever its key', () => {
     expect(
       allowedNetworkIds({
-        networkIds: ['network-unkeyed'],
-        nodeNetworks: [unkeyedTeam],
+        networkIds: ['network-unflagged', 'network-public'],
+        nodeNetworks: [unflaggedKeyed, publicNetwork],
         privateOnly: true,
       }),
     ).toEqual([]);
   });
 
-  it('places nothing for an anonymous session where no network carries a key', () => {
+  it('places nothing for an anonymous session where the node sends no flag', () => {
     expect(
       allowedNetworkIds({
-        networkIds: ['network-unkeyed', 'network-public'],
-        nodeNetworks: [unkeyedTeam, unkeyedPublic],
-        privateOnly: true,
-      }),
-    ).toEqual([]);
-  });
-
-  it('treats an empty key as no key', () => {
-    expect(
-      allowedNetworkIds({
-        networkIds: ['network-empty-key'],
-        nodeNetworks: [emptyKeyTeam],
+        networkIds: ['network-anonymous'],
+        nodeNetworks: [anonymousNetwork],
         privateOnly: true,
       }),
     ).toEqual([]);
@@ -80,20 +110,20 @@ describe(allowedNetworkIds.name, () => {
   it('drops identity networks the node list does not describe', () => {
     expect(
       allowedNetworkIds({
-        networkIds: ['network-unknown'],
-        nodeNetworks,
+        networkIds: ['network-keyed', 'network-unknown'],
+        nodeNetworks: [ownerPrivate],
         privateOnly: true,
       }),
-    ).toEqual([]);
+    ).toEqual(['network-keyed']);
   });
 
   it('keeps every identity network for public communities', () => {
     expect(
       allowedNetworkIds({
-        networkIds: ['network-public', 'network-keyed'],
-        nodeNetworks,
+        networkIds: ['network-keyed', 'network-public'],
+        nodeNetworks: [ownerPrivate, publicNetwork],
         privateOnly: false,
       }),
-    ).toEqual(['network-public', 'network-keyed']);
+    ).toEqual(['network-keyed', 'network-public']);
   });
 });

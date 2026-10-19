@@ -9,7 +9,7 @@ import type { NetworkMutation } from './NetworkMutation';
 import { IdentityMatch } from '../../../../contexts/identities/domain/IdentityMatch';
 import { NetworkInvite } from '../../../../contexts/networks/domain/NetworkInvite';
 import { NetworkInviteCode } from '../../../../contexts/networks/domain/NetworkInviteCode';
-import { isPrivateNodeNetwork } from '../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
+import { isPublicNodeNetwork } from '../../../../contexts/networks/presentation/view-models/nodeNetworkVisibility';
 import { cx } from '../../../../shared/presentation/cx';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { useTechnicalDetailsPreference } from '../../../../shared/presentation/preferences/useTechnicalDetailsPreference';
@@ -256,7 +256,7 @@ function NetworkList({
             <NetworkRow
               canRemove={canRemoveNetworks}
               canShareKey={isOwner && !!network.key}
-              publicNetwork={isOwner && !isPrivateNodeNetwork(network)}
+              publicNetwork={isPublicNodeNetwork(network)}
               copied={copiedNetworkId === network.id}
               disabled={loading !== null}
               key={network.id}
@@ -512,8 +512,7 @@ export function NodeNetworksPanel({
     node?.owner ?? undefined,
     session.identity.id,
   );
-  const hasPublicNetwork =
-    isOwner && networks.some((network) => !isPrivateNodeNetwork(network));
+  const hasPublicNetwork = isOwner && networks.some(isPublicNodeNetwork);
   const canManageNetworks = !!node && (!node.owner || isOwner);
   const canCreatePublicNetwork = canManageNetworks && !hasPublicNetwork;
   const canJoinNetwork = isNetworkInviteCode(joinCode);
@@ -591,7 +590,7 @@ export function NodeNetworksPanel({
     const confirmed = window.confirm(
       copy.nodeSettings.removeNetworkConfirm.replace(
         '{name}',
-        isOwner && !isPrivateNodeNetwork(network)
+        isPublicNodeNetwork(network)
           ? copy.nodeSettings.publicNetworkName
           : network.name,
       ),

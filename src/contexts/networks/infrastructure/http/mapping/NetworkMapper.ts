@@ -9,6 +9,7 @@ export class NetworkMapper {
       id: resource.id,
       key: resource.key ?? undefined,
       name: resource.name,
+      privateNetwork: resource.privateNetwork,
       status: 'attached',
     });
   }

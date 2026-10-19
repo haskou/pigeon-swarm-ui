@@ -1,4 +1,6 @@
-import { assert, type PrimitiveOf, Timestamp } from '@haskou/value-objects';
+import { assert, Timestamp } from '@haskou/value-objects';
+
+import type { NetworkPrimitives } from './NetworkPrimitives';
 
 import { AggregateRoot } from '../../../shared/domain/AggregateRoot';
 import { NetworkInviteUnavailableError } from './errors/NetworkInviteUnavailableError';
@@ -26,12 +28,13 @@ export class Network extends AggregateRoot {
     return network;
   }
 
-  public static fromPrimitives(primitives: PrimitiveOf<Network>): Network {
+  public static fromPrimitives(primitives: NetworkPrimitives): Network {
     return new Network(
       NetworkId.fromString(primitives.id),
       NetworkName.fromString(primitives.name),
       NetworkAttachmentStatus.fromPrimitives(primitives.status),
       primitives.key ? NetworkKey.fromString(primitives.key) : undefined,
+      primitives.privateNetwork,
     );
   }
 
@@ -58,6 +61,7 @@ export class Network extends AggregateRoot {
     private readonly name: NetworkName,
     private status: NetworkAttachmentStatus,
     private readonly key?: NetworkKey,
+    private readonly privateNetwork?: boolean,
   ) {
     super();
   }
@@ -91,11 +95,12 @@ export class Network extends AggregateRoot {
     this.record(new NetworkRemoved(this.id, occurredAt));
   }
 
-  public toPrimitives() {
+  public toPrimitives(): NetworkPrimitives {
     return {
       id: this.id.toString(),
       key: this.key?.toString(),
       name: this.name.toString(),
+      privateNetwork: this.privateNetwork,
       status: this.status.valueOf(),
     };
   }
