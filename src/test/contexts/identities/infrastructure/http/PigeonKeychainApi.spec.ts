@@ -10,6 +10,7 @@ import type { ConversationKeyEntry } from '../../../../../contexts/identities/in
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import type { FirstKeychainPublishState } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultRecord';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
@@ -25,12 +26,42 @@ const owner = KeyPair.fromPrimitives({
 } as never);
 const ownerIdentity = { id: vectors.keys.owner.publicKeyPem };
 
-// Stands for the device vault. A freshly created identity starts awaiting its
-// first keychain publish, so the default marks it pending.
-const firstPublishVault = {
-  completeFirstKeychainPublish: jest.fn().mockResolvedValue(undefined),
-  isFirstKeychainPublishPending: jest.fn().mockResolvedValue(true),
-} as unknown as DeviceIdentityVault;
+// Stands for the device vault's first-publish marker. A freshly created
+// identity starts armed, so the default vault reports armed.
+type FirstPublishMarker = { current: FirstKeychainPublishState };
+
+// A node whose next post fails before it commits, or commits and then loses
+// its answer.
+type PostFailure = { committed: boolean; error: unknown };
+type FlakyNode = { nextPostFailure: PostFailure | undefined; opening: boolean };
+
+function markerVault(
+  initial: FirstKeychainPublishState = 'armed',
+  { failNextClear = false }: { failNextClear?: boolean } = {},
+): { marker: FirstPublishMarker; vault: DeviceIdentityVault } {
+  const marker: FirstPublishMarker = { current: initial };
+  let clearFails = failNextClear;
+  const vault = {
+    firstKeychainPublishState: jest.fn(() => Promise.resolve(marker.current)),
+    setFirstKeychainPublish: jest.fn(
+      (_identityId: IdentityId, next: FirstKeychainPublishState) => {
+        if (next === 'none' && clearFails) {
+          clearFails = false;
+
+          return Promise.reject(new Error('Vault write failed.'));
+        }
+
+        marker.current = next;
+
+        return Promise.resolve();
+      },
+    ),
+  } as unknown as DeviceIdentityVault;
+
+  return { marker, vault };
+}
+
+const firstPublishVault = markerVault().vault;
 
 type StoredKeychain = {
   encryptedPayload: string;
@@ -88,8 +119,8 @@ class FakeKeychainServer {
 
       if (!head) {
         throw new HttpJsonError(
-          404,
-          'Not Found',
+          409,
+          'Conflict',
           JSON.stringify({ code: 'KeychainNotFoundError' }),
         );
       }
@@ -325,7 +356,7 @@ describe(PigeonKeychainApi.name, () => {
     function apiFor(
       request: jest.Mock,
       cipher: KeychainCipher = {} as KeychainCipher,
-      deviceVault: DeviceIdentityVault = firstPublishVault,
+      deviceVault: DeviceIdentityVault = markerVault().vault,
     ): PigeonKeychainApi {
       return new PigeonKeychainApi(
         { request } as unknown as HttpJsonClient,
@@ -535,27 +566,97 @@ describe(PigeonKeychainApi.name, () => {
       expect(server.headConversationIds()).toEqual(['conversation-a']);
     });
 
-    it('refuses a first publish without the first-publish marker before anything is posted', async () => {
+    const notReady = (): HttpJsonError =>
+      new HttpJsonError(
+        503,
+        'Service Unavailable',
+        JSON.stringify({ code: 503020 }),
+      );
+    const serverError = (): HttpJsonError =>
+      new HttpJsonError(500, 'Internal Server Error', '{}');
+    const lostConnection = (): TypeError => new TypeError('Failed to fetch');
+
+    const unpublishedSession = {
+      ...signingSession,
+      keychain: emptyKeychain,
+      keychainExternalIdentifier: null,
+    } as unknown as Session;
+
+    const addConversation =
+      (conversationId: string) =>
+      (current: LocalKeychain): LocalKeychain => ({
+        ...current,
+        conversations: {
+          ...current.conversations,
+          [conversationId]: { conversationId } as ConversationKeyEntry,
+        },
+      });
+
+    // A node that answers 503020 to reads while it opens, and whose next post
+    // can fail before it commits or commit and then lose its answer.
+    function flakyNode(server: FakeKeychainServer): {
+      node: FlakyNode;
+      request: jest.Mock;
+    } {
+      const node: FlakyNode = { nextPostFailure: undefined, opening: false };
+      const answerTo = (init: { body?: string; method: string }): unknown => {
+        if (init.method === 'GET') {
+          if (node.opening) {
+            throw notReady();
+          }
+
+          return server.handle('GET');
+        }
+
+        const failure = node.nextPostFailure;
+        node.nextPostFailure = undefined;
+
+        if (failure && !failure.committed) {
+          throw failure.error;
+        }
+
+        const answer = server.handle(init.method, init.body);
+
+        if (failure) {
+          throw failure.error;
+        }
+
+        return answer;
+      };
+      const request = jest.fn(
+        (_path: string, init: { body?: string; method: string }) =>
+          Promise.resolve().then(() => answerTo(init)),
+      );
+
+      return { node, request };
+    }
+
+    const headlessPosts = (request: jest.Mock): number =>
+      request.mock.calls.filter(([, init]) => {
+        if (init.method !== 'POST') {
+          return false;
+        }
+
+        const body = JSON.parse(init.body) as {
+          previousKeychainExternalIdentifier: string | null;
+        };
+
+        return !body.previousKeychainExternalIdentifier;
+      }).length;
+
+    it('refuses a first publish without an armed marker before anything is posted', async () => {
       const server = new FakeKeychainServer();
       const request = jest.fn(
         (_path: string, init: { body?: string; method: string }) =>
           server.handle(init.method, init.body),
       );
-      const deviceVault = {
-        completeFirstKeychainPublish: jest.fn(),
-        isFirstKeychainPublishPending: jest.fn().mockResolvedValue(false),
-      } as unknown as DeviceIdentityVault;
-      const session = {
-        ...signingSession,
-        keychain: emptyKeychain,
-        keychainExternalIdentifier: null,
-      } as unknown as Session;
 
       await expect(
-        apiFor(request, new KeychainCipher(), deviceVault).publishKeychain(
-          session,
-          (current) => current,
-        ),
+        apiFor(
+          request,
+          new KeychainCipher(),
+          markerVault('none').vault,
+        ).publishKeychain(unpublishedSession, (current) => current),
       ).rejects.toMatchObject({ name: 'KeychainNotFoundError' });
 
       expect(
@@ -566,76 +667,243 @@ describe(PigeonKeychainApi.name, () => {
 
     it('clears the first-publish marker only after the first keychain is accepted', async () => {
       const server = new FakeKeychainServer();
-      const request = jest.fn(
-        (_path: string, init: { body?: string; method: string }) =>
-          server.handle(init.method, init.body),
-      );
-      const deviceVault = {
-        completeFirstKeychainPublish: jest.fn().mockResolvedValue(undefined),
-        isFirstKeychainPublishPending: jest.fn().mockResolvedValue(true),
-      } as unknown as DeviceIdentityVault;
-      const session = {
-        ...signingSession,
-        keychain: emptyKeychain,
-        keychainExternalIdentifier: null,
-      } as unknown as Session;
-      const identityId = IdentityId.fromString(ownerIdentity.id);
-
-      await expect(
-        apiFor(request, new KeychainCipher(), deviceVault).publishKeychain(
-          session,
-          (current) => ({
-            ...current,
-            conversations: {
-              ...current.conversations,
-              'conversation-a': {
-                conversationId: 'conversation-a',
-              } as ConversationKeyEntry,
-            },
-          }),
-        ),
-      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
-
-      expect(deviceVault.isFirstKeychainPublishPending).toHaveBeenCalledWith(
-        identityId,
-      );
-      expect(deviceVault.completeFirstKeychainPublish).toHaveBeenCalledTimes(1);
-      expect(deviceVault.completeFirstKeychainPublish).toHaveBeenCalledWith(
-        identityId,
-      );
-    });
-
-    it('keeps the first-publish marker when the first keychain post is refused', async () => {
-      const server = new FakeKeychainServer();
+      const { marker, vault } = markerVault('armed');
+      const markerAtPost: FirstKeychainPublishState[] = [];
       const request = jest.fn(
         (_path: string, init: { body?: string; method: string }) => {
           if (init.method === 'POST') {
-            return Promise.reject(
-              new HttpJsonError(500, 'Internal Server Error', '{}'),
-            );
+            markerAtPost.push(marker.current);
           }
 
-          return Promise.resolve(server.handle(init.method, init.body));
+          return server.handle(init.method, init.body);
         },
       );
-      const deviceVault = {
-        completeFirstKeychainPublish: jest.fn().mockResolvedValue(undefined),
-        isFirstKeychainPublishPending: jest.fn().mockResolvedValue(true),
-      } as unknown as DeviceIdentityVault;
-      const session = {
-        ...signingSession,
-        keychain: emptyKeychain,
-        keychainExternalIdentifier: null,
-      } as unknown as Session;
 
       await expect(
-        apiFor(request, new KeychainCipher(), deviceVault).publishKeychain(
-          session,
-          (current) => current,
+        apiFor(request, new KeychainCipher(), vault).publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+
+      expect(markerAtPost).toEqual(['armed']);
+      expect(marker.current).toBe('none');
+      expect(vault.setFirstKeychainPublish).toHaveBeenCalledTimes(1);
+      expect(vault.setFirstKeychainPublish).toHaveBeenCalledWith(
+        IdentityId.fromString(ownerIdentity.id),
+        'none',
+      );
+    });
+
+    it('keeps the first-publish marker armed when the node refuses the first post outright', async () => {
+      const server = new FakeKeychainServer();
+      const { node, request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed');
+      node.nextPostFailure = {
+        committed: false,
+        error: new HttpJsonError(
+          409,
+          'Conflict',
+          JSON.stringify({ code: 'KeychainOwnerAlreadyHasKeychainError' }),
+        ),
+      };
+
+      await expect(
+        apiFor(request, new KeychainCipher(), vault).publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toMatchObject({ code: 'KeychainOwnerAlreadyHasKeychainError' });
+
+      expect(marker.current).toBe('armed');
+      expect(server.headConversationIds()).toEqual([]);
+    });
+
+    it('marks the first publish ambiguous when the post fails before the node commits', async () => {
+      const server = new FakeKeychainServer();
+      const { node, request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed');
+      node.nextPostFailure = { committed: false, error: serverError() };
+
+      await expect(
+        apiFor(request, new KeychainCipher(), vault).publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toMatchObject({ status: 500 });
+
+      expect(marker.current).toBe('ambiguous');
+      expect(server.headConversationIds()).toEqual([]);
+    });
+
+    it('publishes again once a re-read confirms the node holds no keychain', async () => {
+      const server = new FakeKeychainServer();
+      const { node, request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed');
+      const api = apiFor(request, new KeychainCipher(), vault);
+      node.nextPostFailure = { committed: false, error: serverError() };
+
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toMatchObject({ status: 500 });
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-1' });
+
+      expect(marker.current).toBe('none');
+      expect(server.headConversationIds()).toEqual(['conversation-a']);
+    });
+
+    it.each([
+      ['a server error', serverError],
+      ['a lost connection', lostConnection],
+    ])(
+      'refuses a head-less retry after the node commits the first post and then fails with %s',
+      async (_label, failure) => {
+        const server = new FakeKeychainServer();
+        const { node, request } = flakyNode(server);
+        const { marker, vault } = markerVault('armed');
+        const api = apiFor(request, new KeychainCipher(), vault);
+        node.nextPostFailure = { committed: true, error: failure() };
+
+        await expect(
+          api.publishKeychain(
+            unpublishedSession,
+            addConversation('conversation-a'),
+          ),
+        ).rejects.toThrow();
+        expect(marker.current).toBe('ambiguous');
+
+        node.opening = true;
+        const retry = expect(
+          api.publishKeychain(
+            unpublishedSession,
+            addConversation('conversation-b'),
+          ),
+        ).rejects.toMatchObject({ name: 'KeychainHeadUnavailableError' });
+
+        await jest.runAllTimersAsync();
+        await retry;
+
+        expect(headlessPosts(request)).toBe(1);
+        expect(marker.current).toBe('ambiguous');
+      },
+    );
+
+    it('adopts the head a lost answer left behind instead of posting a second root', async () => {
+      const server = new FakeKeychainServer();
+      const { node, request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed');
+      const api = apiFor(request, new KeychainCipher(), vault);
+      node.nextPostFailure = { committed: true, error: serverError() };
+
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
         ),
       ).rejects.toThrow();
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-b'),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-2' });
 
-      expect(deviceVault.completeFirstKeychainPublish).not.toHaveBeenCalled();
+      expect(marker.current).toBe('none');
+      expect(headlessPosts(request)).toBe(1);
+      expect(server.headConversationIds()).toEqual([
+        'conversation-a',
+        'conversation-b',
+      ]);
+    });
+
+    it('keeps the first publish ambiguous when clearing the marker fails after the node accepts it', async () => {
+      const server = new FakeKeychainServer();
+      const { node, request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed', { failNextClear: true });
+      const api = apiFor(request, new KeychainCipher(), vault);
+
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toThrow('Vault write failed.');
+      expect(marker.current).toBe('ambiguous');
+      expect(server.headConversationIds()).toEqual(['conversation-a']);
+
+      node.opening = true;
+      const retry = expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-b'),
+        ),
+      ).rejects.toMatchObject({ name: 'KeychainHeadUnavailableError' });
+
+      await jest.runAllTimersAsync();
+      await retry;
+
+      expect(headlessPosts(request)).toBe(1);
+      expect(marker.current).toBe('ambiguous');
+    });
+
+    it('posts one head-less keychain when two first publishes start together', async () => {
+      const server = new FakeKeychainServer();
+      const { request } = flakyNode(server);
+      const { vault } = markerVault('armed');
+      const api = apiFor(request, new KeychainCipher(), vault);
+
+      await expect(
+        Promise.all([
+          api.publishKeychain(
+            unpublishedSession,
+            addConversation('conversation-a'),
+          ),
+          api.publishKeychain(
+            unpublishedSession,
+            addConversation('conversation-b'),
+          ),
+        ]),
+      ).resolves.toHaveLength(2);
+
+      expect(headlessPosts(request)).toBe(1);
+      expect(server.headConversationIds()).toEqual([
+        'conversation-a',
+        'conversation-b',
+      ]);
+    });
+
+    it('refuses an ambiguous retry when the node answers an unknown identity rather than an absent keychain', async () => {
+      const request = jest.fn<Promise<never>, [string, { method: string }]>(
+        () =>
+          Promise.reject(
+            new HttpJsonError(
+              409,
+              'Conflict',
+              JSON.stringify({ code: 'IdentityNotFoundError' }),
+            ),
+          ),
+      );
+      const { marker, vault } = markerVault('ambiguous');
+
+      await expect(
+        apiFor(request, new KeychainCipher(), vault).publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toMatchObject({ name: 'KeychainHeadUnavailableError' });
+
+      expect(
+        request.mock.calls.filter(([, init]) => init.method === 'POST'),
+      ).toEqual([]);
+      expect(marker.current).toBe('ambiguous');
     });
 
     it('fails the publish instead of posting a root when the session holds a pointer and the head stays missing', async () => {

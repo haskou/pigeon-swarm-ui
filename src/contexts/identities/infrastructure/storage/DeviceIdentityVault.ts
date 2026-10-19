@@ -3,7 +3,10 @@ import { assert } from '@haskou/value-objects';
 
 import type { DeviceIdentityKeyMaterial } from '../crypto/DeviceIdentityKeyMaterial';
 import type { ProtectedDeviceIdentity } from '../crypto/ProtectedDeviceIdentity';
-import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
+import type {
+  DeviceIdentityVaultRecord,
+  FirstKeychainPublishState,
+} from './DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultSession } from './DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from './DeviceIdentityVaultStore';
 
@@ -166,27 +169,29 @@ export class DeviceIdentityVault {
   }
 
   /**
-   * Whether this identity, created on this device, still awaits its first
-   * accepted keychain. Only that first publish may be posted without a head.
+   * The first-publish state of an identity created on this device. Only an
+   * `armed` state lets its first keychain post without a head. An identity
+   * with no local record has none.
    */
-  public async isFirstKeychainPublishPending(
+  public async firstKeychainPublishState(
     identityId: IdentityId,
-  ): Promise<boolean> {
-    const record = await this.requiredRecord(identityId);
+  ): Promise<FirstKeychainPublishState> {
+    const record = await this.store.find(identityId);
 
-    return record.firstKeychainPublishPending === true;
+    return record?.firstKeychainPublish ?? 'none';
   }
 
-  public async completeFirstKeychainPublish(
+  public async setFirstKeychainPublish(
     identityId: IdentityId,
+    state: FirstKeychainPublishState,
   ): Promise<void> {
-    await this.store.completeFirstKeychainPublish(identityId);
+    await this.store.setFirstKeychainPublish(identityId, state);
   }
 
   public async register(input: {
     authorizationEpoch?: DeviceAuthorizationEpoch;
     authorizationRevision?: DeviceAuthorizationRevision;
-    firstKeychainPublishPending?: boolean;
+    firstKeychainPublish?: 'armed';
     identityId: IdentityId;
     material: DeviceIdentityKeyMaterial;
     password: string;
@@ -207,15 +212,23 @@ export class DeviceIdentityVault {
       input.authorizationRevision ?? DeviceAuthorizationRevision.initial();
     const createdAt = Date.now();
 
-    await this.store.save({
+    const record: DeviceIdentityVaultRecord = {
       ...this.record(
         protectedIdentity,
         authorizationEpoch,
         authorizationRevision,
         createdAt,
       ),
-      firstKeychainPublishPending: input.firstKeychainPublishPending === true,
-    });
+      firstKeychainPublish: input.firstKeychainPublish ?? 'none',
+    };
+
+    // A first publish arms a new record only. An existing record is refused
+    // rather than re-armed; other registrations overwrite as before.
+    if (input.firstKeychainPublish === 'armed') {
+      await this.store.insert(record);
+    } else {
+      await this.store.save(record);
+    }
 
     return {
       authorizationEpoch,

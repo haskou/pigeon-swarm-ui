@@ -113,7 +113,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
     expectIdentitySigned(http, created.keyPair);
 
     expect(vault.register).toHaveBeenCalledWith(
-      expect.objectContaining({ firstKeychainPublishPending: true }),
+      expect.objectContaining({ firstKeychainPublish: 'armed' }),
     );
 
     expect(http.request).toHaveBeenCalledWith(
@@ -473,7 +473,7 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     await created(http, deviceVault, null);
 
     expect(deviceVault.register).toHaveBeenCalledWith(
-      expect.objectContaining({ firstKeychainPublishPending: true }),
+      expect.objectContaining({ firstKeychainPublish: 'armed' }),
     );
   });
 

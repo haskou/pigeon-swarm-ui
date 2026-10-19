@@ -1,6 +1,9 @@
 import type { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';
-import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
+import type {
+  DeviceIdentityVaultRecord,
+  FirstKeychainPublishState,
+} from './DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultStore as VaultStore } from './DeviceIdentityVaultStore';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
@@ -114,8 +117,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     );
   }
 
-  public async completeFirstKeychainPublish(
+  public async setFirstKeychainPublish(
     identityId: IdentityId,
+    state: FirstKeychainPublishState,
   ): Promise<void> {
     const database = await this.open();
 
@@ -137,7 +141,7 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
 
           store.put({
             ...record,
-            firstKeychainPublishPending: false,
+            firstKeychainPublish: state,
             updatedAt: Date.now(),
           } satisfies DeviceIdentityVaultRecord);
         });
@@ -163,6 +167,10 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
 
   public async save(record: DeviceIdentityVaultRecord): Promise<void> {
     await this.request('readwrite', (store) => store.put(record));
+  }
+
+  public async insert(record: DeviceIdentityVaultRecord): Promise<void> {
+    await this.request('readwrite', (store) => store.add(record));
   }
 
   public async replaceProtection(
@@ -194,10 +202,10 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
           }
 
           // A password change keeps the live marker, so a stale copy cannot
-          // revert a first publish that has already been accepted.
+          // revert a first publish state already recorded.
           store.put({
             ...next,
-            firstKeychainPublishPending: record.firstKeychainPublishPending,
+            firstKeychainPublish: record.firstKeychainPublish,
           } satisfies DeviceIdentityVaultRecord);
         });
         transaction.addEventListener('complete', () => resolve());

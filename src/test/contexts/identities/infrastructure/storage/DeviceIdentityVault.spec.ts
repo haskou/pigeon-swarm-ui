@@ -1,6 +1,9 @@
 import { KeyPair, UserRootKey } from '@haskou/pigeon-swarm-crypto';
 
-import type { DeviceIdentityVaultRecord } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultRecord';
+import type {
+  DeviceIdentityVaultRecord,
+  FirstKeychainPublishState,
+} from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 
 import { IdentityPasswordSymbolRequiredError } from '../../../../../contexts/identities/domain/errors/IdentityPasswordSymbolRequiredError';
@@ -62,13 +65,26 @@ class MemoryStore implements DeviceIdentityVaultStore {
     return Promise.resolve();
   }
 
-  public completeFirstKeychainPublish(identityId: IdentityId): Promise<void> {
+  public insert(record: DeviceIdentityVaultRecord): Promise<void> {
+    if (this.records.has(record.identityId)) {
+      return Promise.reject(new Error('Identity vault record already exists.'));
+    }
+
+    this.records.set(record.identityId, record);
+
+    return Promise.resolve();
+  }
+
+  public setFirstKeychainPublish(
+    identityId: IdentityId,
+    state: FirstKeychainPublishState,
+  ): Promise<void> {
     const record = this.records.get(identityId.valueOf());
 
     if (record) {
       this.records.set(identityId.valueOf(), {
         ...record,
-        firstKeychainPublishPending: false,
+        firstKeychainPublish: state,
         updatedAt: Date.now(),
       });
     }
@@ -105,7 +121,7 @@ class MemoryStore implements DeviceIdentityVaultStore {
 
     this.records.set(next.identityId, {
       ...next,
-      firstKeychainPublishPending: record.firstKeychainPublishPending,
+      firstKeychainPublish: record.firstKeychainPublish,
     });
 
     return Promise.resolve();
@@ -322,30 +338,45 @@ describe(DeviceIdentityVault.name, () => {
   });
 
   describe('first keychain publish marker', () => {
-    it('marks an identity registered as created on this device', async () => {
+    it('arms an identity registered as created on this device', async () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
       await vault.register({
         ...source,
-        firstKeychainPublishPending: true,
+        firstKeychainPublish: 'armed',
         password,
       });
 
       await expect(
-        vault.isFirstKeychainPublishPending(source.identityId),
-      ).resolves.toBe(true);
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('armed');
     });
 
-    it('does not mark an identity registered without the creation flag', async () => {
+    it('reports none for an identity registered without the creation flag', async () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
       await vault.register({ ...source, password });
 
       await expect(
-        vault.isFirstKeychainPublishPending(source.identityId),
-      ).resolves.toBe(false);
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('none');
+    });
+
+    it('refuses to re-arm an identity whose vault record already exists', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({ ...source, password });
+
+      await expect(
+        vault.register({ ...source, firstKeychainPublish: 'armed', password }),
+      ).rejects.toThrow();
+
+      await expect(
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('none');
     });
 
     it('keeps the marker through a password change', async () => {
@@ -354,15 +385,33 @@ describe(DeviceIdentityVault.name, () => {
       const vault = new DeviceIdentityVault(store);
       await vault.register({
         ...source,
-        firstKeychainPublishPending: true,
+        firstKeychainPublish: 'armed',
         password,
       });
 
       await vault.changePassword(source.identityId, password, nextPassword);
 
       await expect(
-        vault.isFirstKeychainPublishPending(source.identityId),
-      ).resolves.toBe(true);
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('armed');
+    });
+
+    it('keeps an ambiguous marker through a password change', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({
+        ...source,
+        firstKeychainPublish: 'armed',
+        password,
+      });
+      await vault.setFirstKeychainPublish(source.identityId, 'ambiguous');
+
+      await vault.changePassword(source.identityId, password, nextPassword);
+
+      await expect(
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('ambiguous');
     });
 
     it('clears the marker once the first keychain publish is accepted', async () => {
@@ -371,15 +420,15 @@ describe(DeviceIdentityVault.name, () => {
       const vault = new DeviceIdentityVault(store);
       await vault.register({
         ...source,
-        firstKeychainPublishPending: true,
+        firstKeychainPublish: 'armed',
         password,
       });
 
-      await vault.completeFirstKeychainPublish(source.identityId);
+      await vault.setFirstKeychainPublish(source.identityId, 'none');
 
       await expect(
-        vault.isFirstKeychainPublishPending(source.identityId),
-      ).resolves.toBe(false);
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('none');
     });
   });
 });

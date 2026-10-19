@@ -146,7 +146,7 @@ export class PigeonIdentityCommandsApi {
     const masterKey = SymmetricKey.fromBuffer(rootKey.getBuffer());
     const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
     const vaultSession = await this.vault.register({
-      firstKeychainPublishPending: true,
+      firstKeychainPublish: 'armed',
       identityId: IdentityId.fromString(identityId),
       material: {
         deviceCredentialKeyPair,
@@ -228,7 +228,7 @@ export class PigeonIdentityCommandsApi {
     const rootKey = UserRootKey.fromBase64(material.masterKey.valueOf());
     const recoveryAuthorityKeyPair = material.recoveryAuthorityKeyPair;
     const vaultSession = await this.vault.register({
-      firstKeychainPublishPending: true,
+      firstKeychainPublish: 'armed',
       identityId: IdentityId.fromString(primitives.id),
       material: {
         deviceCredentialKeyPair: material.deviceCredentialKeyPair,

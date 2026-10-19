@@ -10,6 +10,7 @@ import type {
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
 import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { FirstKeychainPublishState } from '../storage/DeviceIdentityVaultRecord';
 import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
@@ -171,6 +172,77 @@ export class PigeonKeychainApi {
     });
   }
 
+  /**
+   * Posts an identity's first keychain without a head, the only pointer-less
+   * publish allowed. `armed` posts directly. `ambiguous` posts only after a
+   * fresh read proves the node holds no keychain. `none` never posts.
+   */
+  private async publishFirstKeychain(
+    session: Session,
+    identityId: IdentityId,
+    state: FirstKeychainPublishState,
+    update: LocalKeychainUpdate,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    if (state === 'none') {
+      throw new KeychainNotFoundError();
+    }
+
+    const keychain = update(session.keychain);
+
+    if (state === 'ambiguous') {
+      await this.verifyKeychainAbsent(session);
+      await this.vault.setFirstKeychainPublish(identityId, 'armed');
+    }
+
+    try {
+      const published = await this.postKeychain(session, undefined, keychain);
+
+      await this.vault.setFirstKeychainPublish(identityId, 'none');
+
+      return published;
+    } catch (caught: unknown) {
+      // A definitive 4xx refusal commits nothing, so the first publish stays
+      // armed. Any other failure, including a failed clear after acceptance,
+      // may have committed, so the marker becomes ambiguous.
+      const refused =
+        caught instanceof HttpJsonError &&
+        caught.status >= 400 &&
+        caught.status < 500 &&
+        caught.status !== 408;
+
+      if (!refused) {
+        await this.vault.setFirstKeychainPublish(identityId, 'ambiguous');
+      }
+
+      throw caught;
+    }
+  }
+
+  /**
+   * Proves the node holds no keychain for this identity: a fresh read must
+   * answer 409 KeychainNotFoundError. Only 503020 is retried. Any other
+   * outcome, including a head that appears, leaves the publish refused.
+   */
+  private async verifyKeychainAbsent(session: Session): Promise<void> {
+    try {
+      await retryReplicatedStateRead(
+        async () => await this.fetchRemote(session),
+      );
+    } catch (caught: unknown) {
+      if (
+        caught instanceof HttpJsonError &&
+        caught.status === 409 &&
+        caught.code === 'KeychainNotFoundError'
+      ) {
+        return;
+      }
+
+      throw new KeychainHeadUnavailableError();
+    }
+
+    throw new KeychainHeadUnavailableError();
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     return this.cipher.decrypt(session, keychain);
   }
@@ -199,7 +271,21 @@ export class PigeonKeychainApi {
     update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     return await this.enqueuePublish(session.identity.id, async () => {
-      const head = await this.readPublishHead(session);
+      const identityId = IdentityId.fromString(session.identity.id);
+      const state = await this.vault.firstKeychainPublishState(identityId);
+      let head: KeychainHead | undefined;
+
+      try {
+        head = await this.readPublishHead(session);
+      } catch (caught: unknown) {
+        // An ambiguous first publish can be neither adopted nor verified while
+        // the head is unreadable, so it is refused and stays ambiguous.
+        if (state === 'ambiguous') {
+          throw new KeychainHeadUnavailableError();
+        }
+
+        throw caught;
+      }
 
       // A pointer proves a keychain exists. A head still missing after the lag
       // window is not absence: a root posted without a previous link would sit
@@ -209,28 +295,23 @@ export class PigeonKeychainApi {
       }
 
       if (!head) {
-        // Replication can lag behind a keychain another node already holds.
-        // Only an identity's first keychain, created on this device, may post
-        // without a head. Anything else is refused before it is sent. The
-        // marker clears only after that first publish is accepted.
-        const identityId = IdentityId.fromString(session.identity.id);
-
-        if (!(await this.vault.isFirstKeychainPublishPending(identityId))) {
-          throw new KeychainNotFoundError();
-        }
-
-        const published = await this.postKeychain(
+        return await this.publishFirstKeychain(
           session,
-          undefined,
-          update(session.keychain),
+          identityId,
+          state,
+          update,
         );
-
-        await this.vault.completeFirstKeychainPublish(identityId);
-
-        return published;
       }
 
-      return await this.postKeychain(session, head, update(head.keychain));
+      const keychain = update(head.keychain);
+
+      // A head proves the first keychain exists, so a pending or ambiguous
+      // first publish is over. Clearing it adopts this head.
+      if (state !== 'none') {
+        await this.vault.setFirstKeychainPublish(identityId, 'none');
+      }
+
+      return await this.postKeychain(session, head, keychain);
     });
   }
 
