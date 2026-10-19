@@ -29,7 +29,15 @@ import {
   identityPicture,
   publicFileObjectUrl,
 } from '../../../identities/presentation/view-models/identityDisplay';
+import {
+  allowedNetworkIds,
+  selectNetworkId,
+} from '../../../networks/presentation/view-models/nodeNetworkVisibility';
 import { ConversationPeer } from '../view-models/ConversationPeer';
+import {
+  canSubmitDirectConversation,
+  canSubmitGroupConversation,
+} from '../view-models/conversationSubmitGuards';
 import { GroupParticipantSelection } from '../view-models/GroupParticipantSelection';
 
 type LoadState = 'idle' | 'loading' | 'error';
@@ -48,6 +56,8 @@ type SelectedIdentity = {
 interface CreateConversationDialogProps {
   conversations: ConversationResource[];
   nodeNetworks: NodeNetwork[];
+  nodeNetworksLoading: boolean;
+  nodeNetworksLoadError: boolean;
   session: Session;
   onClose: () => void;
   onCreated: (session: Session, conversation: ConversationResource) => void;
@@ -56,6 +66,8 @@ interface CreateConversationDialogProps {
 export function CreateConversationDialog({
   conversations,
   nodeNetworks,
+  nodeNetworksLoading,
+  nodeNetworksLoadError,
   onClose,
   onCreated,
   session,
@@ -90,30 +102,39 @@ export function CreateConversationDialog({
     useState<ContactKeyCheck | null>(null);
   const [groupIdentityAcknowledged, setGroupIdentityAcknowledged] =
     useState(false);
+  const privateNetworkIds = useMemo(
+    () =>
+      allowedNetworkIds({
+        networkIds: session.identity.networks,
+        nodeNetworks,
+        privateOnly: true,
+      }),
+    [nodeNetworks, session.identity.networks],
+  );
   const sharedNetworkIds = useMemo(() => {
     if (!peerIdentity) return [];
 
-    return session.identity.networks.filter((networkId) =>
+    return privateNetworkIds.filter((networkId) =>
       peerIdentity.networks.includes(networkId),
     );
-  }, [peerIdentity, session.identity.networks]);
+  }, [peerIdentity, privateNetworkIds]);
   const groupSharedNetworkIds = useMemo(() => {
     if (groupParticipants.length === 0) return [];
 
-    return session.identity.networks.filter((networkId) =>
+    return privateNetworkIds.filter((networkId) =>
       groupParticipants.every(({ identity }) =>
         identity.networks.includes(networkId),
       ),
     );
-  }, [groupParticipants, session.identity.networks]);
-  const networkOptions = session.identity.networks.map((networkId) => ({
+  }, [groupParticipants, privateNetworkIds]);
+  const networkOptions = privateNetworkIds.map((networkId) => ({
     disabled: peerIdentity ? !sharedNetworkIds.includes(networkId) : true,
     label:
       nodeNetworks.find((network) => network.id === networkId)?.name ??
       networkId,
     value: networkId,
   }));
-  const groupNetworkOptions = session.identity.networks.map((networkId) => ({
+  const groupNetworkOptions = privateNetworkIds.map((networkId) => ({
     disabled:
       groupParticipants.length === 0 ||
       !groupSharedNetworkIds.includes(networkId),
@@ -137,17 +158,23 @@ export function CreateConversationDialog({
         ) === peerIdentity.id,
     );
   }, [conversations, peerIdentity, session.identity.id, session.keychain]);
-  const canSubmitDirect =
-    !!peerIdentity &&
-    !!selectedNetworkId &&
-    !existingDirectConversation &&
-    state !== 'loading' &&
-    !contactKeyBlocked(peerContact, peerContactAcknowledged);
-  const canSubmitGroup =
-    groupName.trim().length > 0 &&
-    groupParticipants.length > 0 &&
-    !!groupNetworkId &&
-    state !== 'loading';
+  const canSubmitDirect = canSubmitDirectConversation({
+    busy: state === 'loading',
+    contactBlocked: contactKeyBlocked(peerContact, peerContactAcknowledged),
+    hasExistingConversation: !!existingDirectConversation,
+    hasNetwork: !!selectedNetworkId,
+    hasPeer: !!peerIdentity,
+    networksFailed: nodeNetworksLoadError,
+    networksLoading: nodeNetworksLoading,
+  });
+  const canSubmitGroup = canSubmitGroupConversation({
+    busy: state === 'loading',
+    hasGroupName: groupName.trim().length > 0,
+    hasNetwork: !!groupNetworkId,
+    hasParticipants: groupParticipants.length > 0,
+    networksFailed: nodeNetworksLoadError,
+    networksLoading: nodeNetworksLoading,
+  });
   const remoteIdentityStatus = remoteIdentityLookupStatus({
     input: peerIdentityId,
     lookupState,
@@ -185,12 +212,7 @@ export function CreateConversationDialog({
         .then((identity) => {
           if (cancelled) return;
 
-          const sharedNetworks = session.identity.networks.filter((networkId) =>
-            identity.networks.includes(networkId),
-          );
-
           setPeerIdentity(identity);
-          setSelectedNetworkId(sharedNetworks[0] ?? '');
           setPeerContact(checkIdentityContact(session.identity.id, identity));
           setPeerContactAcknowledged(false);
           setLookupState('ready');
@@ -210,7 +232,7 @@ export function CreateConversationDialog({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [peerIdentityId, session.identity.id, session.identity.networks]);
+  }, [peerIdentityId, session.identity.id]);
 
   useEffect(() => {
     const identityLookup = normalizeIdentityLookup(groupIdentityInput);
@@ -259,12 +281,16 @@ export function CreateConversationDialog({
   }, [groupIdentityInput, session.identity.id]);
 
   useEffect(() => {
-    if (groupNetworkId && groupSharedNetworkIds.includes(groupNetworkId)) {
-      return;
-    }
+    const next = selectNetworkId(groupNetworkId, groupSharedNetworkIds);
 
-    setGroupNetworkId(groupSharedNetworkIds[0] ?? '');
+    if (next !== groupNetworkId) setGroupNetworkId(next);
   }, [groupNetworkId, groupSharedNetworkIds]);
+
+  useEffect(() => {
+    const next = selectNetworkId(selectedNetworkId, sharedNetworkIds);
+
+    if (next !== selectedNetworkId) setSelectedNetworkId(next);
+  }, [selectedNetworkId, sharedNetworkIds]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -314,8 +340,10 @@ export function CreateConversationDialog({
       return;
     }
 
+    if (nodeNetworksLoading || nodeNetworksLoadError) return;
+
     if (!selectedNetworkId) {
-      setError(copy.dialog.noSharedNetwork);
+      setError(copy.dialog.noSharedPrivateNetwork);
 
       return;
     }
@@ -466,11 +494,13 @@ export function CreateConversationDialog({
                     {copy.dialog.directConversationAlreadyExists}
                   </div>
                 ) : null}
-                {peerIdentity &&
+                {!nodeNetworksLoading &&
+                !nodeNetworksLoadError &&
+                peerIdentity &&
                 lookupState === 'ready' &&
                 sharedNetworkIds.length === 0 ? (
                   <div className="border-l-2 border-amber-300/50 pl-3 text-sm text-amber-100">
-                    {copy.dialog.noSharedNetwork}
+                    {copy.dialog.noSharedPrivateNetwork}
                   </div>
                 ) : null}
               </div>
@@ -601,9 +631,11 @@ export function CreateConversationDialog({
               </div>
 
               {groupParticipants.length > 0 &&
+                !nodeNetworksLoading &&
+                !nodeNetworksLoadError &&
                 groupSharedNetworkIds.length === 0 && (
                   <div className="ui-inline-notice border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
-                    {copy.dialog.noSharedNetwork}
+                    {copy.dialog.noSharedPrivateGroupNetwork}
                   </div>
                 )}
 
@@ -619,6 +651,17 @@ export function CreateConversationDialog({
                   options={groupNetworkOptions}
                 />
               </Field>
+            </div>
+          )}
+
+          {nodeNetworksLoading && (
+            <div className="ui-inline-notice mt-4 border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
+              {copy.dialog.networksLoading}
+            </div>
+          )}
+          {nodeNetworksLoadError && (
+            <div className="ui-inline-notice mt-4 border-amber-300/25 bg-amber-500/10 text-sm text-amber-100">
+              {copy.dialog.networksLoadFailed}
             </div>
           )}
 

@@ -8,17 +8,20 @@ import { loadApplicationContainer } from '../../../../app/composition/loadApplic
 import { nodeBootstrapApi } from '../../../../app/composition/nodeBootstrapApi';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import { loadNodeNetworkList } from '../../presentation/view-models/nodeNetworksLoad';
 
 type NodeNetworksState = {
   error: Error | null;
   loading: boolean;
-  node: (NodeInfo & { owner: string | null }) | null;
   networks: NodeNetwork[];
+  networksError: boolean;
+  node: (NodeInfo & { owner: string | null }) | null;
   reload: () => Promise<void>;
 };
 
 export function useNodeNetworks(session?: Session | null): NodeNetworksState {
   const [networks, setNetworks] = useState<NodeNetwork[]>([]);
+  const [networksError, setNetworksError] = useState(false);
   const [node, setNode] = useState<
     (NodeInfo & { owner: string | null }) | null
   >(null);
@@ -33,20 +36,22 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
       const nodeInfo = await nodeBootstrapApi.getInfo();
 
       setNode(nodeInfo);
-      try {
+
+      const list = await loadNodeNetworkList(async () => {
         if (session) {
           const applicationContainer = await loadApplicationContainer();
 
-          setNetworks(await applicationContainer.networks.list(session));
-
-          return;
+          return applicationContainer.networks.list(session);
         }
 
-        setNetworks(await nodeBootstrapApi.getNetworks());
-      } catch {
-        setNetworks([]);
-      }
+        return nodeBootstrapApi.getNetworks();
+      });
+
+      setNetworks(list.networks);
+      setNetworksError(list.failed);
     } catch (caught) {
+      setNetworks([]);
+      setNetworksError(true);
       setError(new Error(toUserErrorMessage(caught, copy.nodeSettings.error)));
     } finally {
       setLoading(false);
@@ -57,5 +62,5 @@ export function useNodeNetworks(session?: Session | null): NodeNetworksState {
     void reload();
   }, [reload]);
 
-  return { error, loading, networks, node, reload };
+  return { error, loading, networks, networksError, node, reload };
 }

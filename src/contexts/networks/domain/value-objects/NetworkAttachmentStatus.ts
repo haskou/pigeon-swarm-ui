@@ -1,6 +1,8 @@
 import { Enum } from '@haskou/value-objects';
 
-const values = ['attached', 'removed'] as const;
+import type { NetworkAttachmentStatusValue } from './NetworkAttachmentStatusValue';
+
+const values: readonly NetworkAttachmentStatusValue[] = ['attached', 'removed'];
 
 export class NetworkAttachmentStatus extends Enum<(typeof values)[number]> {
   public static attached(): NetworkAttachmentStatus {

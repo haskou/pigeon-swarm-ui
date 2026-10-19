@@ -35,4 +35,28 @@ describe(NetworkMapper.name, () => {
       name: 'Public network',
     });
   });
+
+  it('carries the node privateNetwork flag onto the aggregate', () => {
+    const network = mapper.toAggregate({
+      id: 'network-a',
+      name: 'Builders',
+      privateNetwork: true,
+    });
+
+    expect(network.toPrimitives()).toEqual({
+      id: 'network-a',
+      name: 'Builders',
+      privateNetwork: true,
+      status: 'attached',
+    });
+  });
+
+  it('leaves the privateNetwork flag absent when the node resource omits it', () => {
+    const network = mapper.toAggregate({
+      id: 'network-a',
+      name: 'Builders',
+    });
+
+    expect(network.toPrimitives().privateNetwork).toBeUndefined();
+  });
 });

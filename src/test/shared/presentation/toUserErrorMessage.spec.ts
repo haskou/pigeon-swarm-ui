@@ -184,4 +184,16 @@ describe(toUserErrorMessage.name, () => {
       copy.errors.backend[code],
     );
   });
+
+  it('explains that direct and private community creation needs a private network', () => {
+    const error = new HttpJsonError(
+      409,
+      'Conflict',
+      JSON.stringify({ code: 'PrivateNetworkRequiredError', httpStatus: 409 }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend.PrivateNetworkRequiredError,
+    );
+  });
 });

@@ -23,6 +23,11 @@ import { GlassSelect } from '../../../../shared/presentation/components/glassSel
 import { DialogHeader } from '../../../../shared/presentation/components/DialogHeader';
 import { useCloseOnEscape } from '../../../../shared/presentation/hooks/useCloseOnEscape';
 import { useCloseTransition } from '../../../../shared/presentation/hooks/useCloseTransition';
+import {
+  allowedNetworkIds,
+  selectNetworkId,
+} from '../../../networks/presentation/view-models/nodeNetworkVisibility';
+import { canSubmitCommunity } from '../view-models/canSubmitCommunity';
 import { CommunityPublicSettingsPanel } from './CommunityPublicSettingsPanel';
 
 const ImageCropEditor = lazy(() =>
@@ -36,6 +41,8 @@ const ImageCropEditor = lazy(() =>
 interface CreateCommunityDialogProps {
   headerControl?: ReactElement;
   nodeNetworks: NodeNetwork[];
+  nodeNetworksLoading: boolean;
+  nodeNetworksLoadError: boolean;
   onClose: () => void;
   onCreated: (input: { community: Community; session: Session }) => void;
   session: Session;
@@ -52,6 +59,8 @@ const channelNamePattern = /^[a-z0-9][a-z0-9_-]*$/;
 export function CreateCommunityDialog({
   headerControl,
   nodeNetworks,
+  nodeNetworksLoading,
+  nodeNetworksLoadError,
   onClose,
   onCreated,
   session,
@@ -62,9 +71,7 @@ export function CreateCommunityDialog({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [networkId, setNetworkId] = useState(
-    session.identity.networks[0] ?? '',
-  );
+  const [networkId, setNetworkId] = useState('');
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
@@ -87,23 +94,44 @@ export function CreateCommunityDialog({
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const networkOptions = useMemo(
     () =>
-      session.identity.networks.map((id) => ({
+      allowedNetworkIds({
+        networkIds: session.identity.networks,
+        nodeNetworks,
+        privateOnly: visibility === 'private',
+      }).map((id) => ({
         label: nodeNetworks.find((network) => network.id === id)?.name ?? id,
         value: id,
       })),
-    [nodeNetworks, session.identity.networks],
+    [nodeNetworks, session.identity.networks, visibility],
   );
   const channelInputError = channelName.trim()
     ? channelValidationError(channelName, channels)
     : null;
   const canAddChannel = channelName.trim().length > 0 && !channelInputError;
-  const canSubmit =
-    name.trim().length > 0 &&
-    channels.length > 0 &&
-    channels.every((channel) => channelNameIsValid(channel.name)) &&
-    channelNamesAreUnique(channels) &&
-    networkId.length > 0 &&
-    state !== 'loading';
+  const privateNetworkHelp = nodeNetworksLoadError
+    ? copy.dialog.networksLoadFailed
+    : nodeNetworksLoading
+      ? copy.dialog.networksLoading
+      : copy.communities.noPrivateNetwork;
+  const networkHelp =
+    visibility === 'private' &&
+    (nodeNetworksLoading ||
+      nodeNetworksLoadError ||
+      networkOptions.length === 0)
+      ? privateNetworkHelp
+      : copy.communities.networkCreateHelp;
+  const canSubmit = canSubmitCommunity({
+    busy: state === 'loading',
+    channelsValid:
+      channels.length > 0 &&
+      channels.every((channel) => channelNameIsValid(channel.name)) &&
+      channelNamesAreUnique(channels),
+    hasName: name.trim().length > 0,
+    hasNetwork: networkId.length > 0,
+    networksFailed: nodeNetworksLoadError,
+    networksLoading: nodeNetworksLoading,
+    visibility,
+  });
 
   useEffect(() => {
     if (!avatar) {
@@ -132,6 +160,15 @@ export function CreateCommunityDialog({
 
     return () => URL.revokeObjectURL(nextPreview);
   }, [banner]);
+
+  useEffect(() => {
+    const next = selectNetworkId(
+      networkId,
+      networkOptions.map((option) => option.value),
+    );
+
+    if (next !== networkId) setNetworkId(next);
+  }, [networkId, networkOptions]);
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -326,7 +363,7 @@ export function CreateCommunityDialog({
                 />
               </label>
               <p className="mt-3 text-xs leading-relaxed text-white/45">
-                {copy.communities.networkCreateHelp}
+                {networkHelp}
               </p>
               <div className="mt-5">
                 <CommunityPublicSettingsPanel
