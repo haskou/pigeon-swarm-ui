@@ -159,6 +159,7 @@ describe('CallSignalDispatcher', () => {
     const first = dispatcher.receive(signal('call-1', 'peer-1'));
     const second = dispatcher.receive(signal('call-1', 'peer-2'));
 
+    await new Promise((resolve) => setTimeout(resolve, 0));
     release();
     await Promise.all([first, second]);
 

@@ -130,7 +130,7 @@ describe(CallSignalVerifier.name, () => {
   it('opens a signal from an authorised device and raises the floor to the verified head', async () => {
     const { floors, verifier } = build();
 
-    await expect(verifier.open(session, signalOf())).resolves.toEqual({
+    await expect(verifier.receive(session, signalOf())).resolves.toEqual({
       payload: { sdp: 'offer-sdp' },
     });
     expect(floors.raise).toHaveBeenCalledWith(session, sender, 3);
@@ -139,7 +139,7 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a device the verified chain revoked', async () => {
     expect(
       await refusal(
-        build().verifier.open(session, signalOf({ signer: 'target' })),
+        build().verifier.receive(session, signalOf({ signer: 'target' })),
       ),
     ).toBe('sender-unauthorised');
   });
@@ -147,14 +147,16 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a device the chain never authorised', async () => {
     expect(
       await refusal(
-        build().verifier.open(session, signalOf({ signer: 'recovered' })),
+        build().verifier.receive(session, signalOf({ signer: 'recovered' })),
       ),
     ).toBe('sender-unauthorised');
   });
 
   it('refuses when fewer than two replicas return a chain', async () => {
     expect(
-      await refusal(build({ logs: [log] }).verifier.open(session, signalOf())),
+      await refusal(
+        build({ logs: [log] }).verifier.receive(session, signalOf()),
+      ),
     ).toBe('chain-unverified');
   });
 
@@ -166,21 +168,24 @@ describe(CallSignalVerifier.name, () => {
 
     expect(
       await refusal(
-        build({ logs: [recovered, lost] }).verifier.open(session, signalOf()),
+        build({ logs: [recovered, lost] }).verifier.receive(
+          session,
+          signalOf(),
+        ),
       ),
     ).toBe('chain-unverified');
   });
 
   it('refuses a head below the persisted floor', async () => {
     expect(
-      await refusal(build({ floor: 4 }).verifier.open(session, signalOf())),
+      await refusal(build({ floor: 4 }).verifier.receive(session, signalOf())),
     ).toBe('stale-head');
   });
 
   it('refuses a sealing view that claims a revision beyond the verified head', async () => {
     expect(
       await refusal(
-        build({ viewRevision: 9 }).verifier.open(session, signalOf()),
+        build({ viewRevision: 9 }).verifier.receive(session, signalOf()),
       ),
     ).toBe('stale-head');
   });
@@ -190,7 +195,7 @@ describe(CallSignalVerifier.name, () => {
 
     expect(
       await refusal(
-        build().verifier.open(session, { ...signal, signalType: 'answer' }),
+        build().verifier.receive(session, { ...signal, signalType: 'answer' }),
       ),
     ).toBe('bad-signature');
   });
@@ -198,7 +203,7 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a signal sent by a different identity than the conversation parties', async () => {
     expect(
       await refusal(
-        build({ conversationId: 'one-to-one:other' }).verifier.open(
+        build({ conversationId: 'one-to-one:other' }).verifier.receive(
           session,
           signalOf(),
         ),
@@ -209,7 +214,10 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a signal for a call whose scope is unknown', async () => {
     expect(
       await refusal(
-        build({ conversationId: undefined }).verifier.open(session, signalOf()),
+        build({ conversationId: undefined }).verifier.receive(
+          session,
+          signalOf(),
+        ),
       ),
     ).toBe('party-mismatch');
   });
@@ -219,7 +227,7 @@ describe(CallSignalVerifier.name, () => {
     async (scopeType) => {
       expect(
         await refusal(
-          build().verifier.open(
+          build().verifier.receive(
             session,
             signalOf({ scopeType } as unknown as Overrides),
           ),
@@ -231,7 +239,7 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a signal to oneself', async () => {
     expect(
       await refusal(
-        build().verifier.open(
+        build().verifier.receive(
           session,
           signalOf({ senderIdentityId: recipient }),
         ),
@@ -242,7 +250,7 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a signal addressed to another identity', async () => {
     expect(
       await refusal(
-        build().verifier.open(
+        build().verifier.receive(
           session,
           signalOf({ recipientIdentityId: 'someone-else' }),
         ),
@@ -253,7 +261,7 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a signal with no entry for this device', async () => {
     expect(
       await refusal(
-        build().verifier.open(
+        build().verifier.receive(
           session,
           signalOf({
             sealedEntries: [
@@ -268,7 +276,7 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a lifetime that is not exactly 20 seconds', async () => {
     expect(
       await refusal(
-        build().verifier.open(
+        build().verifier.receive(
           session,
           signalOf({ expiresAt: NOW - 1_000 + 60_000 }),
         ),
@@ -279,7 +287,10 @@ describe(CallSignalVerifier.name, () => {
   it('refuses an expired signal', async () => {
     expect(
       await refusal(
-        build({ clock: () => NOW + 30_000 }).verifier.open(session, signalOf()),
+        build({ clock: () => NOW + 30_000 }).verifier.receive(
+          session,
+          signalOf(),
+        ),
       ),
     ).toBe('expired');
   });
@@ -287,7 +298,10 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a signal created more than 5 seconds in the future', async () => {
     expect(
       await refusal(
-        build({ clock: () => NOW - 7_000 }).verifier.open(session, signalOf()),
+        build({ clock: () => NOW - 7_000 }).verifier.receive(
+          session,
+          signalOf(),
+        ),
       ),
     ).toBe('expired');
   });
@@ -295,9 +309,11 @@ describe(CallSignalVerifier.name, () => {
   it('refuses a replay of an accepted signal id', async () => {
     const { verifier } = build();
 
-    await verifier.open(session, signalOf());
+    await verifier.receive(session, signalOf());
 
-    expect(await refusal(verifier.open(session, signalOf()))).toBe('replayed');
+    expect(await refusal(verifier.receive(session, signalOf()))).toBe(
+      'replayed',
+    );
   });
 
   it('refuses an envelope this device cannot decrypt', async () => {
@@ -305,7 +321,7 @@ describe(CallSignalVerifier.name, () => {
 
     expect(
       await refusal(
-        build().verifier.open(
+        build().verifier.receive(
           session,
           signalOf({
             sealedEntries: [

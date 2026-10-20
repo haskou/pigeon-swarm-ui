@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { CallResource } from '../../../../contexts/calls/infrastructure/http/resources/CallResource';
-import type { CallSignalType } from '../../../../contexts/calls/infrastructure/media/CallSignalType';
+import type { SealedCallSignal } from '../../../../contexts/calls/infrastructure/signals/SealedCallSignal';
 import type { CallSession } from '../../../../contexts/calls/presentation/view-models/CallSession';
 import type { Session } from '../../../../contexts/identities/infrastructure/session/Session';
 import type { RealtimeDomainEvent } from '../../../../shared/infrastructure/realtime/RealtimeGateway';
-import type { ReceivedCallSignal } from './ReceivedCallSignal';
 
 import { acknowledgeRealtimeCallSignal } from '../../../../app/presentation/realtime/useRealtimeEvents';
 import {
@@ -21,7 +20,6 @@ import {
   callIdFromRealtimeEvent,
   callSignalTypeAttribute,
   numberAttribute,
-  recordAttribute,
   stringAttribute,
 } from './realtimeEventAttributes';
 
@@ -31,39 +29,40 @@ type WorkspaceRealtimeCallEventsInput = {
     calls: CallResource[],
     previousActiveCallId?: string,
   ) => void;
-  receiveSignal: (input: {
-    callId: string;
-    payload: Record<string, unknown>;
-    senderIdentityId: string;
-    signalType: CallSignalType;
-  }) => Promise<void>;
+  receiveSignal: (signal: SealedCallSignal) => Promise<void>;
   reconcileCallResource: (call: CallResource) => void;
   sessionRef: { current: Session };
 };
 
+/**
+ * The sealed wire object of a `calls.v1.signal.sent` event. Fields are only
+ * read here; whether the signal is genuine is the verifier's verdict.
+ */
 function receivedCallSignal(
   event: RealtimeDomainEvent,
   recipientIdentityId: string,
-): ReceivedCallSignal | undefined {
-  const senderIdentityId = stringAttribute(event, 'senderIdentityId');
-  const recipient = stringAttribute(event, 'recipientIdentityId');
+): SealedCallSignal | undefined {
   const signalType = callSignalTypeAttribute(event);
-  const payload = recordAttribute(event, 'payload');
-  const expiresAt = numberAttribute(event, 'expiresAt');
-  const signalId = stringAttribute(event, 'signalId');
+  const sealedEntries = event.attributes.sealedEntries;
+  const signal = {
+    callId: stringAttribute(event, 'callId'),
+    createdAt: numberAttribute(event, 'createdAt'),
+    expiresAt: numberAttribute(event, 'expiresAt'),
+    networkId: stringAttribute(event, 'networkId'),
+    recipientIdentityId: stringAttribute(event, 'recipientIdentityId'),
+    scopeType: stringAttribute(event, 'scopeType'),
+    sealedEntries: Array.isArray(sealedEntries) ? sealedEntries : undefined,
+    senderDeviceCredential: stringAttribute(event, 'senderDeviceCredential'),
+    senderIdentityId: stringAttribute(event, 'senderIdentityId'),
+    signalId: stringAttribute(event, 'signalId'),
+    signalType,
+    signature: stringAttribute(event, 'signature'),
+  };
 
-  if (
-    !senderIdentityId ||
-    recipient !== recipientIdentityId ||
-    !signalType ||
-    !payload ||
-    expiresAt === undefined ||
-    !signalId
-  ) {
-    return undefined;
-  }
-
-  return { expiresAt, payload, senderIdentityId, signalId, signalType };
+  return signal.recipientIdentityId === recipientIdentityId &&
+    Object.values(signal).every((value) => value !== undefined)
+    ? (signal as SealedCallSignal)
+    : undefined;
 }
 
 export function useWorkspaceRealtimeCallEvents(
@@ -155,17 +154,11 @@ export function useWorkspaceRealtimeCallEvents(
           sessionRef.current.identity.id,
         );
 
-        if (eventCallId && signal) {
+        if (signal) {
           void callSignalDeliveriesRef.current
             .receive(
               { expiresAt: signal.expiresAt, signalId: signal.signalId },
-              async () =>
-                await receiveSignal({
-                  callId: eventCallId,
-                  payload: signal.payload,
-                  senderIdentityId: signal.senderIdentityId,
-                  signalType: signal.signalType,
-                }),
+              async () => await receiveSignal(signal),
               () =>
                 acknowledgeRealtimeCallSignal(
                   sessionRef.current,
@@ -177,7 +170,7 @@ export function useWorkspaceRealtimeCallEvents(
                 'workspace:realtime-call-event:signal-processing-failed',
                 caught,
                 {
-                  callId: eventCallId,
+                  callId: signal.callId,
                   senderIdentityId: signal.senderIdentityId,
                   signalType: signal.signalType,
                 },

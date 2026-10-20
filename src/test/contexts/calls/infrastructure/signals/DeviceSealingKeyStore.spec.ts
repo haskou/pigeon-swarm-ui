@@ -32,10 +32,10 @@ describe('call sealing stores', () => {
 
   it('keeps one sealing key per device across reloads, in its own database', async () => {
     const first = await new DeviceSealingKeyStore(
-      new DeviceSealedEntryStore(name, 'call sealing'),
+      new DeviceSealedEntryStore(name, 'call-sealing'),
     ).publicKey(session());
     const again = await new DeviceSealingKeyStore(
-      new DeviceSealedEntryStore(name, 'call sealing'),
+      new DeviceSealedEntryStore(name, 'call-sealing'),
     ).publicKey(session());
 
     expect(again).toBe(first);
@@ -47,7 +47,7 @@ describe('call sealing stores', () => {
     const { decodeBase64Url } =
       await import('../../../../../shared/infrastructure/encoding/base64url');
     const store = new DeviceSealingKeyStore(
-      new DeviceSealedEntryStore(name, 'call sealing'),
+      new DeviceSealedEntryStore(name, 'call-sealing'),
     );
     const sealed = X25519PublicKey.fromRaw(
       decodeBase64Url(await store.publicKey(session())),
@@ -60,7 +60,7 @@ describe('call sealing stores', () => {
 
   it('keeps the verifier floor per identity and only raises it', async () => {
     const floors = new VerifierFloorStore(
-      new DeviceSealedEntryStore(name, 'call sealing'),
+      new DeviceSealedEntryStore(name, 'call-sealing'),
     );
 
     expect(await floors.get(session(), 'bob')).toBe(0);
@@ -69,7 +69,7 @@ describe('call sealing stores', () => {
 
     expect(
       await new VerifierFloorStore(
-        new DeviceSealedEntryStore(name, 'call sealing'),
+        new DeviceSealedEntryStore(name, 'call-sealing'),
       ).get(session(), 'bob'),
     ).toBe(4);
     expect(await floors.get(session(), 'carol')).toBe(0);

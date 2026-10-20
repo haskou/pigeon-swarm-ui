@@ -1,8 +1,11 @@
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 import type { CallPeerConnections } from '../../infrastructure/media/CallPeerConnections';
 import type { CallSignalType } from '../../infrastructure/media/CallSignalType';
+import type { CallSignalRefusalReason } from '../../infrastructure/signals/CallSignalRefusedError';
+import type { SealedCallSignal } from '../../infrastructure/signals/SealedCallSignal';
 import type { CallSession } from '../view-models/CallSession';
 
+import { CallSignalRefusedError } from '../../infrastructure/signals/CallSignalRefusedError';
 import {
   logCallDebug,
   logCallWarning,
@@ -25,7 +28,15 @@ export type ReceivedCallSignal = {
   signalType: CallSignalType;
 };
 
+export type RefusedCallSignal = {
+  callId: string;
+  reason: CallSignalRefusalReason;
+  senderIdentityId: string;
+};
+
 export class CallSignalDispatcher {
+  private opening: Promise<void> = Promise.resolve();
+
   private currentIdentityIdValue: null | string = null;
 
   private readonly pendingSignals = new Map<string, ReceivedCallSignal[]>();
@@ -37,6 +48,10 @@ export class CallSignalDispatcher {
   public constructor(
     private readonly peerManager: CallPeerConnections,
     private readonly activeCallId: () => string | undefined,
+    private readonly open: (
+      signal: SealedCallSignal,
+    ) => Promise<Record<string, unknown>>,
+    private readonly onRefused: (refusal: RefusedCallSignal) => void,
   ) {}
 
   public get currentIdentityId(): null | string {
@@ -127,25 +142,65 @@ export class CallSignalDispatcher {
     this.startingCallId = null;
   }
 
-  public async receive(input: ReceivedCallSignal): Promise<void> {
+  /**
+   * Opens a sealed signal and applies it. Openings run in arrival order so
+   * the application order of offers and candidates is preserved; a refused
+   * signal is reported and never applied.
+   */
+  public receive(signal: SealedCallSignal): Promise<void> {
+    const activeCallId = this.activeCallId();
+
+    if (activeCallId && activeCallId !== signal.callId) {
+      logCallWarning('session:receive-signal:ignored-other-call', {
+        activeCallId,
+        callId: signal.callId,
+      });
+
+      return Promise.resolve();
+    }
+
+    const applied = this.opening.then(async () => {
+      let payload: Record<string, unknown>;
+
+      try {
+        payload = await this.open(signal);
+      } catch (error) {
+        if (!(error instanceof CallSignalRefusedError)) throw error;
+
+        logCallWarning('session:receive-signal:refused', {
+          callId: signal.callId,
+          reason: error.reason,
+        });
+        this.onRefused({
+          callId: signal.callId,
+          reason: error.reason,
+          senderIdentityId: signal.senderIdentityId,
+        });
+
+        return;
+      }
+
+      await this.apply({
+        callId: signal.callId,
+        payload,
+        senderIdentityId: signal.senderIdentityId,
+        signalType: signal.signalType,
+      });
+    });
+
+    this.opening = applied.catch(() => undefined);
+
+    return applied;
+  }
+
+  private async apply(input: ReceivedCallSignal): Promise<void> {
     logCallDebug('session:receive-signal', {
-      activeCallId: this.activeCallId(),
       callId: input.callId,
       senderIdentityId: input.senderIdentityId,
       signalType: input.signalType,
       startingCallId: this.startingCallId,
     });
     const sendSignal = this.sendSignalValue;
-    const activeCallId = this.activeCallId();
-
-    if (activeCallId && activeCallId !== input.callId) {
-      logCallWarning('session:receive-signal:ignored-other-call', {
-        activeCallId,
-        callId: input.callId,
-      });
-
-      return;
-    }
 
     if (!sendSignal || this.startingCallId === input.callId) {
       logCallDebug('session:receive-signal:queued', {
