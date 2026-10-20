@@ -13,6 +13,11 @@ import { CallAccessContexts } from '../../contexts/calls/infrastructure/http/Cal
 import { CallMapper } from '../../contexts/calls/infrastructure/http/CallMapper';
 import { PigeonCallRepository } from '../../contexts/calls/infrastructure/http/PigeonCallRepository';
 import { PigeonCallSignalRepository } from '../../contexts/calls/infrastructure/http/PigeonCallSignalRepository';
+import { CallSignalSealer } from '../../contexts/calls/infrastructure/signals/CallSignalSealer';
+import { CallSignalVerifier } from '../../contexts/calls/infrastructure/signals/CallSignalVerifier';
+import { DeviceSealingKeyStore } from '../../contexts/calls/infrastructure/signals/DeviceSealingKeyStore';
+import { DeviceSealingRecordPublisher } from '../../contexts/calls/infrastructure/signals/DeviceSealingRecordPublisher';
+import { VerifierFloorStore } from '../../contexts/calls/infrastructure/signals/VerifierFloorStore';
 import { CommunityMemberRolesAssigner } from '../../contexts/communities/application/assign-community-member-roles/CommunityMemberRolesAssigner';
 import { CommunityMemberBanner } from '../../contexts/communities/application/ban-community-member/CommunityMemberBanner';
 import { CommunityChannelCreator } from '../../contexts/communities/application/create-community-channel/CommunityChannelCreator';
@@ -75,6 +80,7 @@ import { MessageReactionRemover } from '../../contexts/messages/application/remo
 import { ConversationDraftSaver } from '../../contexts/messages/application/save-conversation-draft/ConversationDraftSaver';
 import { MessageUnpinner } from '../../contexts/messages/application/unpin-message/MessageUnpinner';
 import { PigeonDraftRepository } from '../../contexts/messages/infrastructure/http/PigeonDraftRepository';
+import { DeviceSealedEntryStore } from '../../contexts/messages/infrastructure/mailbox/DeviceSealedEntryStore';
 import { DirectMessageMailbox } from '../../contexts/messages/infrastructure/mailbox/DirectMessageMailbox';
 import { MailboxDirectMessageRepository } from '../../contexts/messages/infrastructure/mailbox/MailboxDirectMessageRepository';
 import { NetworkNodeClaimer } from '../../contexts/networks/application/claim-network-node/NetworkNodeClaimer';
@@ -247,6 +253,11 @@ export class PigeonApplication {
       callMapper,
     );
     const callSessions = new CallSessionRegistrar(callContexts);
+    const callSealingEntries = new DeviceSealedEntryStore(
+      'pigeon-call-sealing',
+      'call-sealing',
+    );
+    const callSealingKeys = new DeviceSealingKeyStore(callSealingEntries);
     this.calls = new PigeonCallsFacade(
       new PigeonCallReader(
         callSessions,
@@ -273,7 +284,39 @@ export class PigeonApplication {
       new PigeonCallSignaling(
         callSessions,
         new CallSignalSender(
-          new PigeonCallSignalRepository(gateway.calls, callContexts),
+          new PigeonCallSignalRepository(
+            gateway.calls,
+            callContexts,
+            new CallSignalSealer(
+              gateway.callSealing,
+              () => Date.now(),
+              () => crypto.randomUUID(),
+            ),
+          ),
+        ),
+        new CallSignalVerifier({
+          clock: () => Date.now(),
+          floors: new VerifierFloorStore(callSealingEntries),
+          genesis: async (identityId) =>
+            await gateway.callSignalGenesis.genesis(identityId),
+          keys: callSealingKeys,
+          logs: async (session, identityId) =>
+            await gateway.callSignalReplicas.logs(session, identityId),
+          parties: {
+            conversationId: async (session, callId) => {
+              const { scope } = await gateway.calls.get(session, callId);
+
+              return 'conversationId' in scope
+                ? scope.conversationId
+                : undefined;
+            },
+          },
+          view: gateway.callSealing,
+        }),
+        new DeviceSealingRecordPublisher(
+          callSealingKeys,
+          gateway.callSealing,
+          () => Date.now(),
         ),
       ),
     );

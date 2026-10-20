@@ -35,10 +35,9 @@ describe(DeviceSealingRecordPublisher.name, () => {
 
     await publisher.publish(session);
 
-    expect(api.publishRecord.mock.calls.map(([, r]) => r.utcDay)).toEqual([
-      '2026-10-04',
-      '2026-10-03',
-    ]);
+    expect(
+      api.publishRecord.mock.calls.map(([, r]) => String(r.utcDay)),
+    ).toEqual(['2026-10-04', '2026-10-03']);
     const [, record] = api.publishRecord.mock.calls[0];
 
     expect(record).toMatchObject({
@@ -68,11 +67,9 @@ describe(DeviceSealingRecordPublisher.name, () => {
     now = Date.UTC(2026, 9, 5, 0, 1, 0);
     await publisher.publish(session);
 
-    expect(api.publishRecord.mock.calls.map(([, r]) => r.utcDay)).toEqual([
-      '2026-10-04',
-      '2026-10-03',
-      '2026-10-05',
-    ]);
+    expect(
+      api.publishRecord.mock.calls.map(([, r]) => String(r.utcDay)),
+    ).toEqual(['2026-10-04', '2026-10-03', '2026-10-05']);
   });
 
   it('retries a day whose publication failed', async () => {
@@ -82,10 +79,8 @@ describe(DeviceSealingRecordPublisher.name, () => {
     await expect(publisher.publish(session)).rejects.toThrow('offline');
     await publisher.publish(session);
 
-    expect(api.publishRecord.mock.calls.map(([, r]) => r.utcDay)).toEqual([
-      '2026-10-04',
-      '2026-10-04',
-      '2026-10-03',
-    ]);
+    expect(
+      api.publishRecord.mock.calls.map(([, r]) => String(r.utcDay)),
+    ).toEqual(['2026-10-04', '2026-10-04', '2026-10-03']);
   });
 });

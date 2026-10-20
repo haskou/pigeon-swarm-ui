@@ -1,5 +1,6 @@
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
+import type { CallSignalRefusalReason } from '../../infrastructure/signals/CallSignalRefusedError';
 import type { CallMediaEncryptionState } from './CallMediaEncryptionState';
 import type { CallMicrophoneErrorCode } from './CallMicrophoneErrorCode';
 import type { CallParticipant } from './CallParticipant';
@@ -28,6 +29,8 @@ export type CallSession = {
   screenShareQuality: ScreenShareQualityPreset;
   screenShareVolumes: Record<string, number>;
   screenSharing: boolean;
+  /** Why a received signal was refused; set with the failed status. */
+  signalRefusal?: CallSignalRefusalReason;
   startedAt: number;
   status:
     | 'connecting'

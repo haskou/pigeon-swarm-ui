@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 import type { CallMediaKey } from '../../infrastructure/media/CallMediaKey';
+import type { SealedCallSignal } from '../../infrastructure/signals/SealedCallSignal';
 import type { CallMicrophoneErrorCode } from '../view-models/CallMicrophoneErrorCode';
 import type { CallSession } from '../view-models/CallSession';
 import type { CallSessionControls } from './CallSessionControls';
-import type { ReceivedCallSignal as ReceivedSignal } from './CallSignalDispatcher';
 import type { ReconcileCallInput } from './ReconcileCallInput';
 import type { StartCallInput } from './StartCallInput';
 
@@ -36,7 +36,12 @@ import { reconciledCallParticipants } from './reconciledCallParticipants';
 import { useCallMediaControls } from './useCallMediaControls';
 import { useCallStatsRefresh } from './useCallStatsRefresh';
 
-export function useCallSession(): CallSessionControls {
+export function useCallSession(
+  openSignal: (signal: SealedCallSignal) => Promise<Record<string, unknown>>,
+): CallSessionControls {
+  const openSignalRef = useRef(openSignal);
+
+  openSignalRef.current = openSignal;
   const mediaManager = useMemo(() => new LocalCallMedia(), []);
   const peerManager = useMemo(
     () =>
@@ -49,7 +54,17 @@ export function useCallSession(): CallSessionControls {
   const activeCallRef = useRef<CallSession | null>(null);
   const signals = useMemo(
     () =>
-      new CallSignalDispatcher(peerManager, () => activeCallRef.current?.id),
+      new CallSignalDispatcher(
+        peerManager,
+        () => activeCallRef.current?.id,
+        async (signal) => await openSignalRef.current(signal),
+        ({ callId, reason }) =>
+          setActiveCall((current) =>
+            current?.id === callId
+              ? { ...current, signalRefusal: reason, status: 'failed' }
+              : current,
+          ),
+      ),
     [peerManager],
   );
   const callMediaConnections = useCallback(
@@ -324,7 +339,7 @@ export function useCallSession(): CallSessionControls {
     [peerManager, signals],
   );
 
-  const receiveSignal = (input: ReceivedSignal) => signals.receive(input);
+  const receiveSignal = (signal: SealedCallSignal) => signals.receive(signal);
 
   const retryConnection = useCallback(() => {
     if (activeCallRef.current) peerManager.retryConnections();

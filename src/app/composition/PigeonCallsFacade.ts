@@ -3,6 +3,7 @@ import type { CallParticipantMediaConnectionResource } from '../../contexts/call
 import type { CallResource } from '../../contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSignalDeliveryResource } from '../../contexts/calls/infrastructure/http/resources/CallSignalDeliveryResource';
 import type { CallSignalPayload } from '../../contexts/calls/infrastructure/media/CallSignalPayload';
+import type { SealedCallSignal } from '../../contexts/calls/infrastructure/signals/SealedCallSignal';
 import type { Session } from '../../contexts/identities/infrastructure/session/Session';
 
 import { PigeonCallParticipation } from './calls/PigeonCallParticipation';
@@ -60,6 +61,18 @@ export class PigeonCallsFacade {
 
   public async list(session: Session): Promise<CallResource[]> {
     return await this.reader.search(session);
+  }
+
+  /** The payload of a sealed signal; throws CallSignalRefusedError. */
+  public async openSignal(
+    session: Session,
+    signal: SealedCallSignal,
+  ): Promise<Record<string, unknown>> {
+    return await this.signaling.open(session, signal);
+  }
+
+  public async publishSealingRecords(session: Session): Promise<void> {
+    await this.signaling.publishSealingRecords(session);
   }
 
   public async sendSignal(

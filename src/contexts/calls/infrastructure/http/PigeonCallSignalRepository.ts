@@ -1,10 +1,10 @@
+import type { Session } from '../../../identities/infrastructure/session/Session';
 import type { CallSignalRepository } from '../../domain/repositories/CallSignalRepository';
 import type { CallId } from '../../domain/value-objects/CallId';
 import type { CallIdentityId } from '../../domain/value-objects/CallIdentityId';
 import type { CallSignal } from '../../domain/value-objects/CallSignal';
 import type { CallSignalSealInput } from '../signals/CallSignalSealer';
 import type { SealedCallSignal } from '../signals/SealedCallSignal';
-import type { Session } from '../../../identities/infrastructure/session/Session';
 
 import { CallSignalDelivery } from '../../domain/entities/CallSignalDelivery';
 import { CallAccessContexts } from './CallAccessContexts';

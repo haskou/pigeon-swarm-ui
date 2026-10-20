@@ -16,6 +16,22 @@ export function CallConnectionNotice({
     call.currentIdentityId,
   );
 
+  if (call.signalRefusal) {
+    return (
+      <div
+        role="status"
+        className="rounded-lg border border-amber-300/25 bg-amber-300/10 p-2 text-xs text-amber-100"
+      >
+        <p>
+          {call.signalRefusal === 'chain-unverified' ||
+          call.signalRefusal === 'stale-head'
+            ? copy.calls.signalRefusedUnverified
+            : copy.calls.signalRefused}
+        </p>
+      </div>
+    );
+  }
+
   if (!state) return null;
 
   const message: Record<CallAudioConnectionState, string> = {

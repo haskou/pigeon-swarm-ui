@@ -205,6 +205,10 @@ export const es = {
     connectionRecovering: 'Reconectando el audio de la llamada…',
     connectionRecoveryExhausted:
       'No se pudo reconectar el audio con uno o varios participantes. Comprueba tu conexión y reintenta, o sal y vuelve a entrar en la llamada.',
+    signalRefused:
+      'No se pudo verificar la señal de llamada del otro participante. La conexión se rechazó por tu seguridad.',
+    signalRefusedUnverified:
+      'No se pudo confirmar ahora los dispositivos del otro participante. Inténtalo de nuevo en un momento.',
     connectionRelayed:
       'El audio pasa por un servidor de relevo, lo que puede añadir un ligero retraso.',
     deafen: 'Silenciar audio de llamada',

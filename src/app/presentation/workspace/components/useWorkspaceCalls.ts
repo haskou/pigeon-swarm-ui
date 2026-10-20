@@ -32,6 +32,7 @@ import { useCallDeparture } from './useCallDeparture';
 import { useCallMediaRekey } from './useCallMediaRekey';
 import { useCallResourceReconciliation } from './useCallResourceReconciliation';
 import { useCallStartActions } from './useCallStartActions';
+import { useDeviceSealingRecords } from './useDeviceSealingRecords';
 import { useWorkspaceCallHeartbeat } from './useWorkspaceCallHeartbeat';
 import { useWorkspaceRealtimeCallEvents } from './useWorkspaceRealtimeCallEvents';
 
@@ -135,7 +136,10 @@ export function useWorkspaceCalls({
     toggleMute,
     toggleNoiseCancellation,
     toggleScreenShare,
-  } = useCallSession();
+  } = useCallSession(
+    async (signal) =>
+      await applicationContainer.calls.openSignal(sessionRef.current, signal),
+  );
   const {
     noiseCancellationEnabled,
     requestOptionalLocalAudio,
@@ -146,6 +150,15 @@ export function useWorkspaceCalls({
     onError: onErrorChange,
     toggleNoiseCancellation,
   });
+
+  useDeviceSealingRecords(
+    session.identity.id,
+    async () =>
+      await applicationContainer.calls.publishSealingRecords(
+        sessionRef.current,
+      ),
+    () => sessionRef.current,
+  );
 
   useEffect(() => {
     activeCallRef.current = activeCall;

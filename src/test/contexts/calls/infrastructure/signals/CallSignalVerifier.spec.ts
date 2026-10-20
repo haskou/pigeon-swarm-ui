@@ -4,6 +4,7 @@ import {
   X25519KeyPair,
 } from '@haskou/pigeon-swarm-crypto';
 
+import type { SealedCallSignal } from '../../../../../contexts/calls/infrastructure/signals/SealedCallSignal';
 import type { DeviceAuthorizationTransitionLogPrimitives } from '../../../../../contexts/identities/domain/DeviceAuthorizationTransitionLogPrimitives';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
@@ -15,7 +16,6 @@ import { DeviceCredential } from '../../../../../contexts/identities/domain/valu
 import { IdentityId } from '../../../../../contexts/identities/domain/value-objects/IdentityId';
 import { RecoveryAuthority } from '../../../../../contexts/identities/domain/value-objects/RecoveryAuthority';
 import vectors from '../../../../fixtures/device-authorization-transition-log-vectors.json';
-import type { SealedCallSignal } from '../../../../../contexts/calls/infrastructure/signals/SealedCallSignal';
 
 type Keys = Record<string, { privateKeyPem: string; publicKeyPem: string }>;
 
@@ -95,21 +95,24 @@ const build = (
   const verifier = new CallSignalVerifier({
     clock: overrides.clock ?? (() => NOW),
     floors,
-    genesis: async () => genesis(),
-    keys: { keyPair: async () => mySealing },
-    logs: async () => overrides.logs ?? [log, log],
+    genesis: () => Promise.resolve(genesis()),
+    keys: { keyPair: () => Promise.resolve(mySealing) },
+    logs: () => Promise.resolve(overrides.logs ?? [log, log]),
     parties: {
-      conversationId: async () =>
-        'conversationId' in overrides
-          ? overrides.conversationId
-          : CommitmentId.oneToOneConversation(sender, recipient, networkId),
+      conversationId: () =>
+        Promise.resolve(
+          'conversationId' in overrides
+            ? overrides.conversationId
+            : CommitmentId.oneToOneConversation(sender, recipient, networkId),
+        ),
     },
     view: {
-      sealingView: async () => ({
-        devices: [],
-        identityId: sender,
-        revision: overrides.viewRevision ?? 3,
-      }),
+      sealingView: () =>
+        Promise.resolve({
+          devices: [],
+          identityId: sender,
+          revision: overrides.viewRevision ?? 3,
+        }),
     },
   });
 

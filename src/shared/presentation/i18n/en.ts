@@ -199,6 +199,10 @@ export const en = {
     connectionRecovering: 'Reconnecting call audio…',
     connectionRecoveryExhausted:
       'Audio could not reconnect with one or more participants. Check your connection and retry, or leave and rejoin the call.',
+    signalRefused:
+      "Could not verify the other participant's call signal. The call connection was refused for your security.",
+    signalRefusedUnverified:
+      "Could not confirm the other participant's devices right now. Try the call again in a moment.",
     connectionRelayed:
       'Audio is relayed through a server, which can add a little delay.',
     deafen: 'Silence call audio',
