@@ -84,6 +84,9 @@ jobs:
           yarn test:e2e e2e/call-media-encryption.spec.ts
           --project=desktop-chromium --project=desktop-firefox
 
+      - name: Verify the desktop members background in Chromium
+        run: yarn test:e2e e2e/members-panel-background.spec.ts --project=desktop-chromium
+
       - name: Upload Playwright traces
         if: failure()
         uses: actions/upload-artifact@v4
