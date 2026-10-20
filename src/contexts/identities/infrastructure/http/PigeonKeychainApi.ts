@@ -266,6 +266,13 @@ export class PigeonKeychainApi {
     );
   }
 
+  /**
+   * Publishes the session's keychain. A publish with no pointer may post a
+   * head-less keychain only when the vault marker admits it: `armed`, or
+   * `ambiguous` after a fresh read proves the node holds no keychain. A
+   * pointer whose head cannot be read throws `KeychainHeadUnavailableError`
+   * before any admission check, so a pointer never reaches the head-less path.
+   */
   public async publishKeychain(
     session: Session,
     update: LocalKeychainUpdate,
