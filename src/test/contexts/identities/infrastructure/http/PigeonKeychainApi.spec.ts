@@ -575,6 +575,8 @@ describe(PigeonKeychainApi.name, () => {
     const serverError = (): HttpJsonError =>
       new HttpJsonError(500, 'Internal Server Error', '{}');
     const lostConnection = (): TypeError => new TypeError('Failed to fetch');
+    const timedOut = (): DOMException =>
+      new DOMException('Keychain request timed out.', 'TimeoutError');
 
     const unpublishedSession = {
       ...signingSession,
@@ -763,6 +765,7 @@ describe(PigeonKeychainApi.name, () => {
     it.each([
       ['a server error', serverError],
       ['a lost connection', lostConnection],
+      ['a timeout', timedOut],
     ])(
       'refuses a head-less retry after the node commits the first post and then fails with %s',
       async (_label, failure) => {
@@ -852,6 +855,35 @@ describe(PigeonKeychainApi.name, () => {
 
       expect(headlessPosts(request)).toBe(1);
       expect(marker.current).toBe('ambiguous');
+    });
+
+    it('adopts the accepted head on retry once the node answers again after the marker clear fails', async () => {
+      const server = new FakeKeychainServer();
+      const { request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed', { failNextClear: true });
+      const api = apiFor(request, new KeychainCipher(), vault);
+
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toThrow('Vault write failed.');
+      expect(marker.current).toBe('ambiguous');
+
+      await expect(
+        api.publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-b'),
+        ),
+      ).resolves.toMatchObject({ keychainExternalIdentifier: 'kc-2' });
+
+      expect(marker.current).toBe('none');
+      expect(headlessPosts(request)).toBe(1);
+      expect(server.headConversationIds()).toEqual([
+        'conversation-a',
+        'conversation-b',
+      ]);
     });
 
     it('posts one head-less keychain when two first publishes start together', async () => {
