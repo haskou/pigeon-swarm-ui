@@ -17,7 +17,8 @@ const origin = 'http://127.0.0.1:8080';
 // two-device revoke flow, the private-community kick, the group conversation
 // removal, the history backup and restore, recovery-key sign-in over a saved
 // keychain, and a contact's shared status and its expiry once the contact
-// goes invisible run on desktop Chromium.
+// goes invisible, and the members column that stays visible without an open chat,
+// run on desktop Chromium.
 const runs = [
   {
     specs: [
@@ -40,6 +41,7 @@ const runs = [
       'e2e/history-backup.spec.ts',
       'e2e/recovery-key-keychain.spec.ts',
       'e2e/contact-presence.spec.ts',
+      'e2e/empty-members-column.spec.ts',
     ],
     projects: ['desktop-chromium'],
   },
