@@ -6,13 +6,19 @@ import {
   useState,
 } from 'react';
 
-import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import {
+  forgetCommunitiesSeen,
+  hasSeenCommunities,
+  rememberCommunitiesSeen,
+} from '../../infrastructure/storage/communitiesSeen';
 import { CommunityList } from '../view-models/CommunityList';
+import { readCommunitiesUntilSettled } from './readCommunitiesUntilSettled';
 
 type CommunitiesState = {
   communities: Community[];
@@ -47,6 +53,12 @@ export function useCommunities(session?: null | Session): CommunitiesState {
         const uniqueCommunities = CommunityList.withUniqueIds(resolved);
 
         if (sessionIdentityId) {
+          if (uniqueCommunities.length > 0) {
+            rememberCommunitiesSeen(sessionIdentityId);
+          } else {
+            forgetCommunitiesSeen(sessionIdentityId);
+          }
+
           communityCacheByIdentityId.set(sessionIdentityId, {
             communities: uniqueCommunities,
             storedAt: Date.now(),
@@ -83,8 +95,10 @@ export function useCommunities(session?: null | Session): CommunitiesState {
 
     try {
       const applicationContainer = await loadApplicationContainer();
-      const nextCommunities =
-        await applicationContainer.communities.list(session);
+      const nextCommunities = await readCommunitiesUntilSettled({
+        hadCommunities: hasSeenCommunities(identityId),
+        read: async () => await applicationContainer.communities.list(session),
+      });
 
       rememberCommunities((current) =>
         CommunityList.preservingVoicePresence(nextCommunities, current),

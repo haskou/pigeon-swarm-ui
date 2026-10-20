@@ -1,14 +1,16 @@
+import { CommunityListNotSettledError } from '../../../../../contexts/communities/presentation/hooks/CommunityListNotSettledError';
+import { readCommunitiesUntilSettled } from '../../../../../contexts/communities/presentation/hooks/readCommunitiesUntilSettled';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
-import {
-  CommunityListNotSettledError,
-  readCommunitiesUntilSettled,
-} from '../../../../../contexts/communities/presentation/hooks/readCommunitiesUntilSettled';
 
 const community = { id: 'community-1' } as never;
 const delaysMs = [1, 1, 1];
 
 function notReady(): HttpJsonError {
-  return new HttpJsonError('replicated state not ready', 503, '503020');
+  return new HttpJsonError(
+    503,
+    'Service Unavailable',
+    JSON.stringify({ code: 503020 }),
+  );
 }
 
 describe('readCommunitiesUntilSettled', () => {
