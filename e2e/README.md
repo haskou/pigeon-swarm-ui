@@ -328,4 +328,5 @@ Projects: `desktop-chromium`, `desktop-firefox`, `desktop-webkit`,
 pairing and last-login-prefill specs pass on Chromium desktop, Chromium mobile
 and Firefox. `last-login-prefill` checks the remembered identity preview the
 login screen settles in, not the identity input it shows until the lookup
-resolves; it passes on every project and is not part of the wrapper CI run.
+resolves; it passes on every project and runs in the real node suite
+(`yarn test:e2e:real-node`) on Chromium desktop, Chromium mobile and Firefox.
