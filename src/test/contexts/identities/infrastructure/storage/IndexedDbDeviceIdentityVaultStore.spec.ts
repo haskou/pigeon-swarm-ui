@@ -114,4 +114,22 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     ).resolves.toBeUndefined();
     await expect(store.find(identityId)).resolves.toBeUndefined();
   });
+
+  it('keeps the marker when a save omits it', async () => {
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    await store.save(recordFor(identityId.valueOf()));
+    await store.setFirstKeychainPublish(identityId, 'ambiguous');
+
+    const unmarked = recordFor(identityId.valueOf(), {
+      envelope: 'envelope-2',
+    });
+    delete unmarked.firstKeychainPublish;
+    await store.save(unmarked);
+
+    await expect(store.find(identityId)).resolves.toMatchObject({
+      envelope: 'envelope-2',
+      firstKeychainPublish: 'ambiguous',
+    });
+  });
 });

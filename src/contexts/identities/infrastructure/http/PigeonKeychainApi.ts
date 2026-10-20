@@ -174,8 +174,11 @@ export class PigeonKeychainApi {
 
   /**
    * Posts an identity's first keychain without a head, the only pointer-less
-   * publish allowed. `armed` posts directly. `ambiguous` posts only after a
-   * fresh read proves the node holds no keychain. `none` never posts.
+   * publish allowed, and only from `armed`. The marker moves to `ambiguous`
+   * before the POST, so a post that loses its answer is never repeated
+   * head-less. A definitive 4xx refusal commits nothing and returns the marker
+   * to `armed`. `ambiguous` never posts; it clears only when a head is adopted.
+   * `none` never posts.
    */
   private async publishFirstKeychain(
     session: Session,
@@ -187,60 +190,41 @@ export class PigeonKeychainApi {
       throw new KeychainNotFoundError();
     }
 
-    const keychain = update(session.keychain);
-
     if (state === 'ambiguous') {
-      await this.verifyKeychainAbsent(session);
-      await this.vault.setFirstKeychainPublish(identityId, 'armed');
+      throw new KeychainHeadUnavailableError();
     }
 
+    const keychain = update(session.keychain);
+
+    // Written before the POST, so a failed write sends nothing.
+    await this.vault.setFirstKeychainPublish(identityId, 'ambiguous');
+
+    let published: {
+      keychain: LocalKeychain;
+      keychainExternalIdentifier: string;
+    };
+
     try {
-      const published = await this.postKeychain(session, undefined, keychain);
-
-      await this.vault.setFirstKeychainPublish(identityId, 'none');
-
-      return published;
+      published = await this.postKeychain(session, undefined, keychain);
     } catch (caught: unknown) {
-      // A definitive 4xx refusal commits nothing, so the first publish stays
-      // armed. Any other failure, including a failed clear after acceptance,
-      // may have committed, so the marker becomes ambiguous.
+      // A definitive 4xx refusal commits nothing, so the first publish is
+      // armed again. Any other failure may have committed and stays ambiguous.
       const refused =
         caught instanceof HttpJsonError &&
         caught.status >= 400 &&
         caught.status < 500 &&
         caught.status !== 408;
 
-      if (!refused) {
-        await this.vault.setFirstKeychainPublish(identityId, 'ambiguous');
+      if (refused) {
+        await this.vault.setFirstKeychainPublish(identityId, 'armed');
       }
 
       throw caught;
     }
-  }
 
-  /**
-   * Proves the node holds no keychain for this identity: a fresh read must
-   * answer 409 KeychainNotFoundError. Only 503020 is retried. Any other
-   * outcome, including a head that appears, leaves the publish refused.
-   */
-  private async verifyKeychainAbsent(session: Session): Promise<void> {
-    try {
-      await retryReplicatedStateRead(
-        async () => await this.fetchRemote(session),
-      );
-    } catch (caught: unknown) {
-      if (
-        caught instanceof HttpJsonError &&
-        caught.status === 409 &&
-        caught.code === 'KeychainNotFoundError'
-      ) {
-        return;
-      }
+    await this.vault.setFirstKeychainPublish(identityId, 'none');
 
-      throw new KeychainHeadUnavailableError();
-    }
-
-    throw new KeychainHeadUnavailableError();
+    return published;
   }
 
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
@@ -268,10 +252,11 @@ export class PigeonKeychainApi {
 
   /**
    * Publishes the session's keychain. A publish with no pointer may post a
-   * head-less keychain only when the vault marker admits it: `armed`, or
-   * `ambiguous` after a fresh read proves the node holds no keychain. A
-   * pointer whose head cannot be read throws `KeychainHeadUnavailableError`
-   * before any admission check, so a pointer never reaches the head-less path.
+   * head-less keychain only from the `armed` marker. An `ambiguous` marker is
+   * resolved only by adopting a head the node reports, so while no head is
+   * readable the publish is refused before any POST. A pointer whose head
+   * cannot be read is refused the same way, so a pointer never reaches the
+   * head-less path.
    */
   public async publishKeychain(
     session: Session,
@@ -285,8 +270,8 @@ export class PigeonKeychainApi {
       try {
         head = await this.readPublishHead(session);
       } catch (caught: unknown) {
-        // An ambiguous first publish can be neither adopted nor verified while
-        // the head is unreadable, so it is refused and stays ambiguous.
+        // An ambiguous first publish can only be resolved by adopting a head,
+        // so while the head is unreadable it is refused and stays ambiguous.
         if (state === 'ambiguous') {
           throw new KeychainHeadUnavailableError();
         }

@@ -99,7 +99,12 @@ class MemoryStore implements DeviceIdentityVaultStore {
   }
 
   public save(record: DeviceIdentityVaultRecord): Promise<void> {
-    this.records.set(record.identityId, record);
+    this.records.set(record.identityId, {
+      ...record,
+      firstKeychainPublish:
+        record.firstKeychainPublish ??
+        this.records.get(record.identityId)?.firstKeychainPublish,
+    });
 
     return Promise.resolve();
   }
@@ -429,6 +434,54 @@ describe(DeviceIdentityVault.name, () => {
       await expect(
         vault.firstKeychainPublishState(source.identityId),
       ).resolves.toBe('none');
+    });
+
+    it('keeps an armed marker when the identity is registered again without the creation flag', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({
+        ...source,
+        firstKeychainPublish: 'armed',
+        password,
+      });
+
+      await vault.register({ ...source, password });
+
+      await expect(
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('armed');
+    });
+
+    it('keeps an ambiguous marker when the identity is registered again without the creation flag', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      await vault.register({
+        ...source,
+        firstKeychainPublish: 'armed',
+        password,
+      });
+      await vault.setFirstKeychainPublish(source.identityId, 'ambiguous');
+
+      await vault.register({ ...source, password });
+
+      await expect(
+        vault.firstKeychainPublishState(source.identityId),
+      ).resolves.toBe('ambiguous');
+    });
+
+    it('writes no marker for a registration that omits the creation flag', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      const save = jest.spyOn(store, 'save');
+      const setMarker = jest.spyOn(store, 'setFirstKeychainPublish');
+
+      await vault.register({ ...source, password });
+
+      expect(setMarker).not.toHaveBeenCalled();
+      expect(save.mock.calls[0][0].firstKeychainPublish).toBeUndefined();
     });
   });
 });

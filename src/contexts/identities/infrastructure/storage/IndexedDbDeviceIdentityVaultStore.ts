@@ -166,7 +166,34 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
   }
 
   public async save(record: DeviceIdentityVaultRecord): Promise<void> {
-    await this.request('readwrite', (store) => store.put(record));
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(record.identityId);
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const existing = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          // A save without a marker keeps the stored one, so a registration
+          // cannot clear a pending first publish.
+          store.put({
+            ...record,
+            firstKeychainPublish:
+              record.firstKeychainPublish ?? existing?.firstKeychainPublish,
+          } satisfies DeviceIdentityVaultRecord);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
   }
 
   public async insert(record: DeviceIdentityVaultRecord): Promise<void> {

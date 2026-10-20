@@ -219,11 +219,12 @@ export class DeviceIdentityVault {
         authorizationRevision,
         createdAt,
       ),
-      firstKeychainPublish: input.firstKeychainPublish ?? 'none',
+      firstKeychainPublish: input.firstKeychainPublish,
     };
 
-    // A first publish arms a new record only. An existing record is refused
-    // rather than re-armed; other registrations overwrite as before.
+    // A first publish arms a new record only; an existing record is refused
+    // rather than re-armed. Other registrations overwrite the record and keep
+    // the marker it already holds.
     if (input.firstKeychainPublish === 'armed') {
       await this.store.insert(record);
     } else {
