@@ -15,7 +15,10 @@ export const replicatedStateRetryDelaysMs: readonly number[] = [
 ];
 
 export type ReplicatedStateReadOptions = {
-  /** Called before each wait on a 503020 answer, so the caller can show it. */
+  /**
+   * Called before each wait, on a 503020 answer or a pending value, so the
+   * caller can show it.
+   */
   onNotReady?: () => void;
   signal?: AbortSignal;
 };
@@ -65,6 +68,7 @@ export async function retryReplicatedStateRead<T>(
       return value;
     }
 
+    options.onNotReady?.();
     await waitBeforeRetry(retryDelayMs, options.signal);
   }
 }

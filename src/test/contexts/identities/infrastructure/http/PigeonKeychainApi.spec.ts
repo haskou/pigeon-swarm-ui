@@ -475,6 +475,22 @@ describe(PigeonKeychainApi.name, () => {
       expect(onNotReady).toHaveBeenCalledTimes(1);
     });
 
+    it('reports each wait on a pointer-present 409 miss to the caller', async () => {
+      const onNotReady = jest.fn();
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(lagError())
+        .mockResolvedValueOnce(keychainResource);
+      const pending = apiFor(request).loadOptional(pointedSession, {
+        onNotReady,
+      });
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toBe(keychainResource);
+      expect(onNotReady).toHaveBeenCalledTimes(1);
+    });
+
     it('reads once when the session holds no keychain pointer so login and registration are not delayed', async () => {
       const request = jest.fn().mockRejectedValue(lagError());
       const startedAt = Date.now();

@@ -71,6 +71,24 @@ describe(retryReplicatedStateRead.name, () => {
     expect(onNotReady).toHaveBeenCalledTimes(2);
   });
 
+  it('reports each wait on a pending value too, so the caller can show the node is starting', async () => {
+    const onNotReady = jest.fn();
+    const read = jest
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce('value');
+    const pending = retryReplicatedStateRead(read, {
+      isPending: (value) => value === undefined,
+      onNotReady,
+    });
+
+    await jest.runAllTimersAsync();
+
+    await expect(pending).resolves.toBe('value');
+    expect(onNotReady).toHaveBeenCalledTimes(2);
+  });
+
   it('stops reporting a wait once the schedule is spent', async () => {
     const onNotReady = jest.fn();
     const read = jest.fn().mockRejectedValue(notReadyError());
