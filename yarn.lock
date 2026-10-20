@@ -468,10 +468,10 @@
   resolved "https://registry.yarnpkg.com/@eslint/js/-/js-8.57.1.tgz#de633db3ec2ef6a3c89e2f19038063e8a122e2c2"
   integrity sha512-d9zaMRSTIKDLhctzH12MtXvJKSSUhaHcjV+2Z+GK+EEY7XKpP5yR4x+N3TAcHTcu963nIr+TMcCb4DBCYX1z6Q==
 
-"@haskou/pigeon-swarm-crypto@8.0.2":
-  version "8.0.2"
-  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-8.0.2.tgz#291eba31240fe6aae93d29f46f916a1bdbcf1f4f"
-  integrity sha512-/p9/ItwHZsmGY6ggkbhpm2IOaOnX5NtmrU2PminC6FovEI1wzUfxuieA/lrOJ2TYcF5fxOKo/wSD8VaQ9eJNqg==
+"@haskou/pigeon-swarm-crypto@8.1.0":
+  version "8.1.0"
+  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-8.1.0.tgz#458806f5a3d71dd2d97703f3fdd750269a7bd1ae"
+  integrity sha512-87FGdn5hmweS7vgxgeOauBtwL5GvhlMJkzuUvKoHs2/g9vKGxtQ+TWRU0+X4d97P0q2j9q0R9nEdvfdpRCjtOw==
   dependencies:
     "@noble/ciphers" "2.4.0"
     "@noble/curves" "2.4.0"

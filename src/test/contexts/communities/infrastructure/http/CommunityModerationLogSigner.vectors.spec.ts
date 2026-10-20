@@ -35,7 +35,7 @@ describe(CommunityModerationLogSigner.name, () => {
       expect(
         CommitmentId.communityModerationLog(
           input.communityId,
-          vectors.keys.moderator.identityId,
+          vectors.keys[input.signer as keyof typeof vectors.keys].identityId,
           input.action,
           input.target.type,
           input.target.id,
