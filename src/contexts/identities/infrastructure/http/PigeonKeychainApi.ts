@@ -191,7 +191,7 @@ export class PigeonKeychainApi {
     }
 
     if (state === 'ambiguous') {
-      throw new KeychainHeadUnavailableError();
+      throw new KeychainHeadUnavailableError('ambiguous');
     }
 
     const keychain = update(session.keychain);
@@ -209,6 +209,9 @@ export class PigeonKeychainApi {
     } catch (caught: unknown) {
       // A definitive 4xx refusal commits nothing, so the first publish is
       // armed again. Any other failure may have committed and stays ambiguous.
+      // The node returns 4xx from POST /keychains only before commit
+      // (pigeon-swarm-node origin/main 31fc9d20: PostKeychainRoute.ts:22-50,
+      // KeychainPublisher.ts:46-71, commit at line 71). Keep in step with it.
       const refused =
         caught instanceof HttpJsonError &&
         caught.status >= 400 &&
@@ -273,7 +276,7 @@ export class PigeonKeychainApi {
         // An ambiguous first publish can only be resolved by adopting a head,
         // so while the head is unreadable it is refused and stays ambiguous.
         if (state === 'ambiguous') {
-          throw new KeychainHeadUnavailableError();
+          throw new KeychainHeadUnavailableError('ambiguous');
         }
 
         throw caught;
@@ -283,7 +286,7 @@ export class PigeonKeychainApi {
       // window is not absence: a root posted without a previous link would sit
       // beside the existing keychain, so the publish is refused instead.
       if (!head && session.keychainExternalIdentifier) {
-        throw new KeychainHeadUnavailableError();
+        throw new KeychainHeadUnavailableError('unreplicated');
       }
 
       if (!head) {

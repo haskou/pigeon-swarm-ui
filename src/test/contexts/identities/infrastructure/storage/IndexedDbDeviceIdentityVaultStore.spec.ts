@@ -105,14 +105,30 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     });
   });
 
-  it('ignores a marker write for an identity that has no vault record', async () => {
+  it('refuses a marker write for an identity that has no vault record', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
 
     await expect(
-      store.setFirstKeychainPublish(identityId, 'none'),
-    ).resolves.toBeUndefined();
+      store.setFirstKeychainPublish(identityId, 'ambiguous'),
+    ).rejects.toThrow();
     await expect(store.find(identityId)).resolves.toBeUndefined();
+  });
+
+  it('refuses a marker write for a vault record that is not version 2 and leaves its marker alone', async () => {
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    await store.save({
+      ...recordFor(identityId.valueOf()),
+      version: 1,
+    } as unknown as DeviceIdentityVaultRecord);
+
+    await expect(
+      store.setFirstKeychainPublish(identityId, 'ambiguous'),
+    ).rejects.toThrow();
+    await expect(store.find(identityId)).resolves.toMatchObject({
+      firstKeychainPublish: 'armed',
+    });
   });
 
   it('keeps the marker when a save omits it', async () => {

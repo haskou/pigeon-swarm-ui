@@ -803,6 +803,52 @@ describe(PigeonKeychainApi.name, () => {
       expect(server.headConversationIds()).toEqual([]);
     });
 
+    it('explains an ambiguous refusal as a possible earlier publish, not a head still replicating', async () => {
+      const server = new FakeKeychainServer();
+      const { request } = flakyNode(server);
+      const { vault } = markerVault('ambiguous');
+
+      const attempt = expect(
+        apiFor(request, new KeychainCipher(), vault).publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-a'),
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('earlier first publish'),
+        name: 'KeychainHeadUnavailableError',
+      });
+
+      await jest.runAllTimersAsync();
+      await attempt;
+    });
+
+    it('posts nothing on a head publish when clearing an armed marker fails', async () => {
+      const server = new FakeKeychainServer();
+      await apiFor(
+        flakyNode(server).request,
+        new KeychainCipher(),
+        markerVault('armed').vault,
+      ).publishKeychain(unpublishedSession, addConversation('conversation-a'));
+
+      const { request } = flakyNode(server);
+      const { marker, vault } = markerVault('armed', {
+        failNextWriteTo: 'none',
+      });
+
+      await expect(
+        apiFor(request, new KeychainCipher(), vault).publishKeychain(
+          unpublishedSession,
+          addConversation('conversation-b'),
+        ),
+      ).rejects.toThrow('Vault write failed.');
+
+      expect(
+        request.mock.calls.filter(([, init]) => init.method === 'POST'),
+      ).toHaveLength(0);
+      expect(marker.current).toBe('armed');
+      expect(server.headConversationIds()).toEqual(['conversation-a']);
+    });
+
     it('sends nothing when the ambiguous marker cannot be written before the post', async () => {
       const server = new FakeKeychainServer();
       const { request } = flakyNode(server);

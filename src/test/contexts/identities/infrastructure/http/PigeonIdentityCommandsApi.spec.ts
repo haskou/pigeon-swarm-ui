@@ -477,6 +477,22 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     );
   });
 
+  it('posts nothing and keeps the local identity when the vault already holds it', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(identity()),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+    jest
+      .mocked(deviceVault.register)
+      .mockRejectedValueOnce(new Error('Vault record already exists.'));
+
+    await expect(created(http, deviceVault, null)).rejects.toThrow(
+      'Vault record already exists.',
+    );
+    expect(http.request).not.toHaveBeenCalled();
+    expect(deviceVault.delete).not.toHaveBeenCalled();
+  });
+
   it('forgets the local device identity when the node refuses the code', async () => {
     const refusal = new HttpJsonError(
       403,

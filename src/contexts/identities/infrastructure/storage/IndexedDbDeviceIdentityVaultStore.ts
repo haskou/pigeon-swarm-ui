@@ -136,6 +136,12 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
             | undefined;
 
           if (record?.version !== 2) {
+            reject(
+              new Error(
+                'No version 2 vault record holds the first-publish marker, so it was not set.',
+              ),
+            );
+
             return;
           }
 
