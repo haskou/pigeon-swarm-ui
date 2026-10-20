@@ -1,0 +1,33 @@
+{
+  "note": "Canonical signing text of a sealed call signal and of a device sealing record (RFC 8785 JSON after the domain prefix). The node reference has no shared vector yet: node adopts these two literals.",
+  "signal": {
+    "unsigned": {
+      "callId": "call-vector-1",
+      "createdAt": 1770000000000,
+      "expiresAt": 1770000020000,
+      "networkId": "network-vector-1",
+      "recipientIdentityId": "identity-recipient",
+      "scopeType": "conversation",
+      "sealedEntries": [
+        {
+          "envelope": "ZW52ZWxvcGUtMQ",
+          "recipientDeviceCredential": "device-recipient-1"
+        }
+      ],
+      "senderDeviceCredential": "device-sender",
+      "senderIdentityId": "identity-sender",
+      "signalId": "6f1b3a52-0c1e-4a8b-9d1f-2b7c8a9e0d34",
+      "signalType": "offer"
+    },
+    "signingText": "pigeon:call-signal:v1\n{\"callId\":\"call-vector-1\",\"createdAt\":1770000000000,\"expiresAt\":1770000020000,\"networkId\":\"network-vector-1\",\"recipientIdentityId\":\"identity-recipient\",\"scopeType\":\"conversation\",\"sealedEntries\":[{\"envelope\":\"ZW52ZWxvcGUtMQ\",\"recipientDeviceCredential\":\"device-recipient-1\"}],\"senderDeviceCredential\":\"device-sender\",\"senderIdentityId\":\"identity-sender\",\"signalId\":\"6f1b3a52-0c1e-4a8b-9d1f-2b7c8a9e0d34\",\"signalType\":\"offer\"}"
+  },
+  "sealingRecord": {
+    "record": {
+      "deviceCredential": "device-sender",
+      "identityId": "identity-sender",
+      "sealingPublicKey": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "utcDay": "2026-10-04"
+    },
+    "signingText": "pigeon:device-sealing-record:v1\n{\"deviceCredential\":\"device-sender\",\"identityId\":\"identity-sender\",\"sealingPublicKey\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE\",\"utcDay\":\"2026-10-04\"}"
+  }
+}
