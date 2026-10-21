@@ -11,10 +11,10 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
+import type { DeviceIdentityProtector } from '../../../../../contexts/identities/infrastructure/crypto/DeviceIdentityProtector';
 import type { CreatedIdentityMaterial } from '../../../../../contexts/identities/infrastructure/http/CreatedIdentityMaterial';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { DeviceIdentityProtector } from '../../../../../contexts/identities/infrastructure/crypto/DeviceIdentityProtector';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
@@ -485,9 +485,7 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
       'unacknowledged',
       'armed',
     );
-    expect(
-      jest.mocked(http.request).mock.invocationCallOrder[0],
-    ).toBeLessThan(
+    expect(jest.mocked(http.request).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deviceVault.transitionFirstKeychainPublish).mock
         .invocationCallOrder[0] ?? 0,
     );
@@ -512,23 +510,25 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
     const store = new IndexedDbDeviceIdentityVaultStore();
     const deviceVault = new DeviceIdentityVault(store, {
-      protect: jest.fn().mockImplementation(
-        ({
-          deviceId,
-          secretHandle,
-        }: {
-          deviceId: DeviceId;
-          secretHandle: DeviceUnlockSecretHandle;
-        }) =>
-          Promise.resolve({
+      protect: jest
+        .fn()
+        .mockImplementation(
+          ({
             deviceId,
-            encryptedMaterial: { valueOf: () => 'encrypted-material' },
-            envelope: { serialize: () => 'envelope' },
-            factorKey: {} as CryptoKey,
-            identityId,
             secretHandle,
-          }),
-      ),
+          }: {
+            deviceId: DeviceId;
+            secretHandle: DeviceUnlockSecretHandle;
+          }) =>
+            Promise.resolve({
+              deviceId,
+              encryptedMaterial: { valueOf: () => 'encrypted-material' },
+              envelope: { serialize: () => 'envelope' },
+              factorKey: {} as CryptoKey,
+              identityId,
+              secretHandle,
+            }),
+        ),
     } as unknown as DeviceIdentityProtector);
     const forget = jest.spyOn(deviceVault, 'delete');
     const http = {

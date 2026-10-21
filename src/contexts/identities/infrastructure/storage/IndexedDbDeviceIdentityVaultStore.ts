@@ -13,6 +13,12 @@ const DATABASE_NAME = scopeClientStorageKey('pigeon-swarm-device-vault');
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'identities';
 
+// A transaction aborted without a failed request (quota, close, explicit
+// abort) fires no `error` event; without this the write would never settle.
+function aborted(transaction: IDBTransaction): Error {
+  return transaction.error ?? new Error('Vault transaction aborted.');
+}
+
 export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
   private open(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -44,6 +50,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         request.addEventListener('error', () => reject(request.error));
         request.addEventListener('success', () => resolve(request.result));
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -97,6 +106,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve(written));
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -158,6 +170,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -221,6 +236,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -242,13 +260,13 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
             | DeviceIdentityVaultRecord
             | undefined;
 
-          // Only a record whose first publish never started may be replaced:
-          // an armed record sent no first keychain, so arming again cannot
-          // reopen a publish that may already have reached the node.
+          // Only a record whose identity the node never acknowledged may be
+          // replaced: once the node accepted its genesis, registering again
+          // would post a second genesis for a live identity.
           if (
             existing &&
             (existing.version !== 2 ||
-              existing.firstKeychainPublish !== 'armed')
+              existing.firstKeychainPublish !== 'unacknowledged')
           ) {
             transaction.abort();
             reject(new Error('Vault record already exists.'));
@@ -260,6 +278,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -303,6 +324,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();

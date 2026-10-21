@@ -138,7 +138,7 @@ export class PigeonIdentityCommandsApi {
     const rootKey = UserRootKey.fromBase64(material.masterKey.valueOf());
     const recoveryAuthorityKeyPair = material.recoveryAuthorityKeyPair;
     const vaultSession = await this.vault.register({
-      firstKeychainPublish: 'armed',
+      firstKeychainPublish: 'unacknowledged',
       identityId: IdentityId.fromString(primitives.id),
       material: {
         deviceCredentialKeyPair: material.deviceCredentialKeyPair,
@@ -203,12 +203,24 @@ export class PigeonIdentityCommandsApi {
       );
     } catch (error) {
       // The refusal is what the user must see. A record this cleanup leaves
-      // behind is still armed, since no first keychain was sent, so a retry
-      // replaces it.
+      // behind is still unacknowledged, so a retry replaces it.
       await this.vault
         .delete(IdentityId.fromString(primitives.id))
         .catch(() => undefined);
       throw error;
+    }
+
+    // The node holds the identity now, so its local record is never deleted
+    // from here on, and once armed a retried creation is refused instead of
+    // posting a second genesis.
+    if (
+      !(await this.vault.transitionFirstKeychainPublish(
+        IdentityId.fromString(primitives.id),
+        'unacknowledged',
+        'armed',
+      ))
+    ) {
+      throw new Error('The created identity could not be marked accepted.');
     }
 
     return {

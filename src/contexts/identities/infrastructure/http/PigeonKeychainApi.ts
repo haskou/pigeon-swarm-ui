@@ -223,7 +223,8 @@ export class PigeonKeychainApi {
    * its answer is never repeated head-less and two tabs never both post. A
    * definitive 4xx refusal commits nothing and returns the marker to `armed`
    * unless another tab moved it meanwhile. `ambiguous` never posts; it clears
-   * only when a head is adopted. `none` never posts.
+   * only when a head is adopted. `none` and `unacknowledged`, an identity the
+   * node has not yet accepted, never post.
    */
   private async publishFirstKeychain(
     session: Session,
@@ -231,7 +232,7 @@ export class PigeonKeychainApi {
     state: FirstKeychainPublishState,
     update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    if (state === 'none') {
+    if (state === 'none' || state === 'unacknowledged') {
       throw new KeychainNotFoundError();
     }
 
