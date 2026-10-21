@@ -707,26 +707,29 @@ describe(PigeonKeychainApi.name, () => {
         return !body.previousKeychainExternalIdentifier;
       }).length;
 
-    it('refuses a first publish without an armed marker before anything is posted', async () => {
-      const server = new FakeKeychainServer();
-      const request = jest.fn(
-        (_path: string, init: { body?: string; method: string }) =>
-          server.handle(init.method, init.body),
-      );
+    it.each(['none', 'unacknowledged'] as const)(
+      'refuses a first publish from a %s marker before anything is posted',
+      async (state) => {
+        const server = new FakeKeychainServer();
+        const request = jest.fn(
+          (_path: string, init: { body?: string; method: string }) =>
+            server.handle(init.method, init.body),
+        );
 
-      await expect(
-        apiFor(
-          request,
-          new KeychainCipher(),
-          markerVault('none').vault,
-        ).publishKeychain(unpublishedSession, (current) => current),
-      ).rejects.toMatchObject({ name: 'KeychainNotFoundError' });
+        await expect(
+          apiFor(
+            request,
+            new KeychainCipher(),
+            markerVault(state).vault,
+          ).publishKeychain(unpublishedSession, (current) => current),
+        ).rejects.toMatchObject({ name: 'KeychainNotFoundError' });
 
-      expect(
-        request.mock.calls.filter(([, init]) => init.method === 'POST'),
-      ).toEqual([]);
-      expect(server.headConversationIds()).toEqual([]);
-    });
+        expect(
+          request.mock.calls.filter(([, init]) => init.method === 'POST'),
+        ).toEqual([]);
+        expect(server.headConversationIds()).toEqual([]);
+      },
+    );
 
     it('clears the first-publish marker only after the first keychain is accepted', async () => {
       const server = new FakeKeychainServer();

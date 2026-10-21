@@ -153,33 +153,42 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
 
-    await store.arm(recordFor(identityId.valueOf()));
+    await store.arm(
+      recordFor(identityId.valueOf(), {
+        firstKeychainPublish: 'unacknowledged',
+      }),
+    );
 
     await expect(store.find(identityId)).resolves.toMatchObject({
-      firstKeychainPublish: 'armed',
+      firstKeychainPublish: 'unacknowledged',
     });
   });
 
-  it('replaces a record whose first publish is still armed', async () => {
+  it('replaces a record whose identity post the node never acknowledged', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
-    await store.arm(recordFor(identityId.valueOf()));
+    await store.arm(
+      recordFor(identityId.valueOf(), {
+        firstKeychainPublish: 'unacknowledged',
+      }),
+    );
 
     await store.arm(
       recordFor(identityId.valueOf(), {
         deviceId: 'device-2',
         envelope: 'envelope-2',
+        firstKeychainPublish: 'unacknowledged',
       }),
     );
 
     await expect(store.find(identityId)).resolves.toMatchObject({
       deviceId: 'device-2',
       envelope: 'envelope-2',
-      firstKeychainPublish: 'armed',
+      firstKeychainPublish: 'unacknowledged',
     });
   });
 
-  it.each(['none', 'ambiguous', undefined] as const)(
+  it.each(['armed', 'none', 'ambiguous', undefined] as const)(
     'refuses to arm over a record whose marker is %s and leaves it alone',
     async (firstKeychainPublish) => {
       const store = new IndexedDbDeviceIdentityVaultStore();
@@ -193,7 +202,12 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
       await store.save(existing);
 
       await expect(
-        store.arm(recordFor(identityId.valueOf(), { envelope: 'envelope-2' })),
+        store.arm(
+          recordFor(identityId.valueOf(), {
+            envelope: 'envelope-2',
+            firstKeychainPublish: 'unacknowledged',
+          }),
+        ),
       ).rejects.toThrow();
 
       await expect(store.find(identityId)).resolves.toEqual(existing);

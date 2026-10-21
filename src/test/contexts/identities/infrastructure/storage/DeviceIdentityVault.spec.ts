@@ -1,9 +1,11 @@
 import { KeyPair, UserRootKey } from '@haskou/pigeon-swarm-crypto';
 
+import type { DeviceIdentityKeyMaterial } from '../../../../../contexts/identities/infrastructure/crypto/DeviceIdentityKeyMaterial';
 import type {
   DeviceIdentityVaultRecord,
   FirstKeychainPublishState,
 } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultRecord';
+import type { DeviceIdentityVaultSession } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
 
 import { IdentityPasswordSymbolRequiredError } from '../../../../../contexts/identities/domain/errors/IdentityPasswordSymbolRequiredError';
@@ -68,7 +70,7 @@ class MemoryStore implements DeviceIdentityVaultStore {
   public arm(record: DeviceIdentityVaultRecord): Promise<void> {
     const existing = this.records.get(record.identityId);
 
-    if (existing && existing.firstKeychainPublish !== 'armed') {
+    if (existing && existing.firstKeychainPublish !== 'unacknowledged') {
       return Promise.reject(new Error('Identity vault record already exists.'));
     }
 
@@ -368,19 +370,42 @@ describe(DeviceIdentityVault.name, () => {
   });
 
   describe('first keychain publish marker', () => {
-    it('arms an identity registered as created on this device', async () => {
+    // Registers an identity created on this device whose genesis the node
+    // has acknowledged.
+    async function registerArmed(
+      vault: DeviceIdentityVault,
+      source: { identityId: IdentityId; material: DeviceIdentityKeyMaterial },
+    ): Promise<DeviceIdentityVaultSession> {
+      const session = await vault.register({
+        ...source,
+        firstKeychainPublish: 'unacknowledged',
+        password,
+      });
+
+      await expect(
+        vault.transitionFirstKeychainPublish(
+          source.identityId,
+          'unacknowledged',
+          'armed',
+        ),
+      ).resolves.toBe(true);
+
+      return session;
+    }
+
+    it('marks an identity created on this device as unacknowledged until the node accepts it', async () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
       await vault.register({
         ...source,
-        firstKeychainPublish: 'armed',
+        firstKeychainPublish: 'unacknowledged',
         password,
       });
 
       await expect(
         vault.firstKeychainPublishState(source.identityId),
-      ).resolves.toBe('armed');
+      ).resolves.toBe('unacknowledged');
     });
 
     it('reports none for an identity registered without the creation flag', async () => {
@@ -401,7 +426,11 @@ describe(DeviceIdentityVault.name, () => {
       await vault.register({ ...source, password });
 
       await expect(
-        vault.register({ ...source, firstKeychainPublish: 'armed', password }),
+        vault.register({
+          ...source,
+          firstKeychainPublish: 'unacknowledged',
+          password,
+        }),
       ).rejects.toThrow();
 
       await expect(
@@ -409,63 +438,65 @@ describe(DeviceIdentityVault.name, () => {
       ).resolves.toBe('none');
     });
 
-    it('arms again over a record left armed by an earlier creation attempt', async () => {
+    it('registers again over a record whose identity post the node never acknowledged', async () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
       const first = await vault.register({
         ...source,
-        firstKeychainPublish: 'armed',
+        firstKeychainPublish: 'unacknowledged',
         password,
       });
 
       const second = await vault.register({
         ...source,
-        firstKeychainPublish: 'armed',
+        firstKeychainPublish: 'unacknowledged',
         password,
       });
 
       expect(second.deviceId.valueOf()).not.toBe(first.deviceId.valueOf());
       await expect(store.find(source.identityId)).resolves.toMatchObject({
         deviceId: second.deviceId.valueOf(),
-        firstKeychainPublish: 'armed',
+        firstKeychainPublish: 'unacknowledged',
       });
     });
 
-    it('refuses to arm again once the first publish has started', async () => {
-      const store = new MemoryStore();
-      const source = await fixture();
-      const vault = new DeviceIdentityVault(store);
-      const first = await vault.register({
-        ...source,
-        firstKeychainPublish: 'armed',
-        password,
-      });
-      await vault.transitionFirstKeychainPublish(
-        source.identityId,
-        'armed',
-        'ambiguous',
-      );
+    it.each(['armed', 'ambiguous'] as const)(
+      'refuses to register again over a record the node acknowledged, marked %s',
+      async (state) => {
+        const store = new MemoryStore();
+        const source = await fixture();
+        const vault = new DeviceIdentityVault(store);
+        const first = await registerArmed(vault, source);
 
-      await expect(
-        vault.register({ ...source, firstKeychainPublish: 'armed', password }),
-      ).rejects.toThrow();
+        if (state === 'ambiguous') {
+          await vault.transitionFirstKeychainPublish(
+            source.identityId,
+            'armed',
+            'ambiguous',
+          );
+        }
 
-      await expect(store.find(source.identityId)).resolves.toMatchObject({
-        deviceId: first.deviceId.valueOf(),
-        firstKeychainPublish: 'ambiguous',
-      });
-    });
+        await expect(
+          vault.register({
+            ...source,
+            firstKeychainPublish: 'unacknowledged',
+            password,
+          }),
+        ).rejects.toThrow();
+
+        await expect(store.find(source.identityId)).resolves.toMatchObject({
+          deviceId: first.deviceId.valueOf(),
+          firstKeychainPublish: state,
+        });
+      },
+    );
 
     it('keeps the marker through a password change', async () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
-      await vault.register({
-        ...source,
-        firstKeychainPublish: 'armed',
-        password,
-      });
+      await registerArmed(vault, source);
 
       await vault.changePassword(source.identityId, password, nextPassword);
 
@@ -478,11 +509,7 @@ describe(DeviceIdentityVault.name, () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
-      await vault.register({
-        ...source,
-        firstKeychainPublish: 'armed',
-        password,
-      });
+      await registerArmed(vault, source);
       await vault.transitionFirstKeychainPublish(
         source.identityId,
         'armed',
@@ -500,11 +527,7 @@ describe(DeviceIdentityVault.name, () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
-      await vault.register({
-        ...source,
-        firstKeychainPublish: 'armed',
-        password,
-      });
+      await registerArmed(vault, source);
 
       await vault.clearFirstKeychainPublish(source.identityId);
 
@@ -517,11 +540,7 @@ describe(DeviceIdentityVault.name, () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
-      await vault.register({
-        ...source,
-        firstKeychainPublish: 'armed',
-        password,
-      });
+      await registerArmed(vault, source);
 
       await vault.register({ ...source, password });
 
@@ -534,11 +553,7 @@ describe(DeviceIdentityVault.name, () => {
       const store = new MemoryStore();
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
-      await vault.register({
-        ...source,
-        firstKeychainPublish: 'armed',
-        password,
-      });
+      await registerArmed(vault, source);
       await vault.transitionFirstKeychainPublish(
         source.identityId,
         'armed',

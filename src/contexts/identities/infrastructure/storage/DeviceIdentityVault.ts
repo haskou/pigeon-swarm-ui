@@ -207,7 +207,7 @@ export class DeviceIdentityVault {
   public async register(input: {
     authorizationEpoch?: DeviceAuthorizationEpoch;
     authorizationRevision?: DeviceAuthorizationRevision;
-    firstKeychainPublish?: 'armed';
+    firstKeychainPublish?: 'armed' | 'unacknowledged';
     identityId: IdentityId;
     material: DeviceIdentityKeyMaterial;
     password: string;
