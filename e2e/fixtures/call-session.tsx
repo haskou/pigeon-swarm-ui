@@ -7,6 +7,7 @@ import { useCallSession } from '../../src/contexts/calls/presentation/hooks/useC
 import type { CallSessionControls } from '../../src/contexts/calls/presentation/hooks/CallSessionControls';
 import type { CallResource } from '../../src/contexts/calls/infrastructure/http/resources/CallResource';
 import type { CallSignalType } from '../../src/contexts/calls/infrastructure/media/CallSignalType';
+import type { SealedCallSignal } from '../../src/contexts/calls/infrastructure/signals/SealedCallSignal';
 import type { CallSession } from '../../src/contexts/calls/presentation/view-models/CallSession';
 
 // Renders the production call session hook so microphone, network-change and
@@ -45,9 +46,21 @@ const callResource: CallResource = {
   status: 'active',
 };
 let session: CallSessionControls | null = null;
+// Sealing and verification have their own specs; this page stands in for the
+// opener with the plaintext the peer handed to sendTestSignal.
+const openedPayloads = new Map<string, Record<string, unknown>>();
+let receivedSignals = 0;
 
 function App() {
-  const current = useCallSession();
+  const current = useCallSession(async (signal) => {
+    const payload = openedPayloads.get(signal.signalId);
+
+    openedPayloads.delete(signal.signalId);
+
+    if (!payload) throw new Error('Unknown test signal');
+
+    return payload;
+  });
 
   useEffect(() => {
     session = current;
@@ -156,13 +169,27 @@ window.callSessionTest = {
       title: 'Private title',
     });
   },
-  receive: async (type, payload) =>
-    activeSession().receiveSignal({
+  receive: async (type, payload) => {
+    const signalId = `test-signal-${receivedSignals++}`;
+    const signal: SealedCallSignal = {
       callId,
-      payload,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 20_000,
+      networkId: 'network-1',
+      recipientIdentityId: identity,
+      scopeType: 'conversation',
+      sealedEntries: [],
+      senderDeviceCredential: remote,
       senderIdentityId: remote,
+      signalId,
       signalType: type,
-    }),
+      signature: 'test',
+    };
+
+    openedPayloads.set(signalId, payload);
+
+    return activeSession().receiveSignal(signal);
+  },
   setBackendAvailable: (available) => {
     backendAvailable = available;
   },
