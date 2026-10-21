@@ -10,6 +10,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
+import { HttpConnectionError } from '../../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
@@ -202,7 +203,9 @@ describe(PigeonCommunitiesApi.name, () => {
     it('reads the community list again while the node refuses or its proxy answers 502/503 on startup', async () => {
       const request = jest
         .fn()
-        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockRejectedValueOnce(
+          new HttpConnectionError(new TypeError('Failed to fetch')),
+        )
         .mockRejectedValueOnce(new HttpJsonError(502, 'Bad Gateway', ''))
         .mockRejectedValueOnce(
           new HttpJsonError(503, 'Service Unavailable', ''),
