@@ -36,4 +36,19 @@ describe('community directory use cases', () => {
       ),
     ).resolves.toEqual([community]);
   });
+
+  it('passes the abort signal of a community search on to its repository', async () => {
+    const { signal } = new AbortController();
+
+    communities.search.mockResolvedValue([]);
+
+    await new CommunitiesSearcher(communities).search(
+      new SearchCommunitiesMessage('owner-a'),
+      { signal },
+    );
+
+    expect(communities.search).toHaveBeenCalledWith(expect.anything(), {
+      signal,
+    });
+  });
 });
