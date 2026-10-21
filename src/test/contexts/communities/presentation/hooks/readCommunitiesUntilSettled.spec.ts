@@ -89,4 +89,66 @@ describe('readCommunitiesUntilSettled', () => {
     ).rejects.toThrow('offline');
     expect(read).toHaveBeenCalledTimes(1);
   });
+
+  it('stops waiting as soon as it is aborted', async () => {
+    const controller = new AbortController();
+    const read = jest.fn().mockImplementation(async () => {
+      setTimeout(() => controller.abort(new Error('stop')), 1);
+
+      return [];
+    });
+
+    await expect(
+      readCommunitiesUntilSettled({
+        delaysMs: [60_000],
+        hadCommunities: true,
+        read,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow('stop');
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops waiting for a read in flight when it is aborted', async () => {
+    const controller = new AbortController();
+    const read = jest.fn().mockReturnValue(new Promise<never[]>(() => {}));
+
+    setTimeout(() => controller.abort(new Error('stop')), 1);
+
+    await expect(
+      readCommunitiesUntilSettled({
+        delaysMs,
+        hadCommunities: true,
+        read,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow('stop');
+  });
+
+  it('gives up when the wall-time budget is spent, before the delays are', async () => {
+    const read = jest.fn().mockResolvedValue([]);
+
+    await expect(
+      readCommunitiesUntilSettled({
+        budgetMs: 5,
+        delaysMs: [1, 1, 1, 1000, 1000],
+        hadCommunities: true,
+        read,
+      }),
+    ).rejects.toBeInstanceOf(CommunityListNotSettledError);
+    expect(read.mock.calls.length).toBeLessThan(6);
+  });
+
+  it('gives up on a persistent 503020 when the wall-time budget is spent', async () => {
+    const read = jest.fn().mockRejectedValue(notReady());
+
+    await expect(
+      readCommunitiesUntilSettled({
+        budgetMs: 5,
+        delaysMs: [1, 1, 1000, 1000],
+        hadCommunities: false,
+        read,
+      }),
+    ).rejects.toBeInstanceOf(HttpJsonError);
+  });
 });
