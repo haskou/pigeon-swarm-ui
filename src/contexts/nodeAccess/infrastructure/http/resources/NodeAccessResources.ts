@@ -34,6 +34,7 @@ export type NodeBlockSourceFetchOutcomeResource =
   | 'accepted'
   | 'invalid-document'
   | 'invalid-signature'
+  | 'non-canonical-identity-id'
   | 'not-newer'
   | 'redirected'
   | 'refused-address'

@@ -854,6 +854,8 @@ export const es = {
     backend: {
       400070:
         'El nodo rechazó ese código de registro. Permite entre 1 y 100 usos y elige una caducidad futura dentro del límite del nodo.',
+      400080:
+        'Ese id de identidad no tiene la forma que aceptan los nodos. Pega el id que copió su propietario, o un @handle.',
       401020:
         'La solicitud firmada fue rechazada. Recarga e inténtalo de nuevo.',
       401021:
@@ -1155,6 +1157,8 @@ export const es = {
       'invalid-document': 'La lista no es válida',
       'invalid-signature':
         'Falta la firma o no es válida, o el propietario cambió de clave',
+      'non-canonical-identity-id':
+        'La lista indica un id de identidad que los nodos no aceptan. Pide a su propietario que lo corrija.',
       'not-newer': 'No hay una versión más nueva',
       redirected: 'La dirección redirige a otro sitio',
       'refused-address': 'La dirección no está permitida',
