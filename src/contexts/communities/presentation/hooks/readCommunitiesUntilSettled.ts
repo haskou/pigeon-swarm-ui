@@ -55,6 +55,8 @@ async function readOnce<T>(
   read: (signal: AbortSignal) => Promise<T[]>,
   signal: AbortSignal,
 ): Promise<ReadOutcome<T>> {
+  signal.throwIfAborted();
+
   try {
     return { communities: await abortable(read(signal), signal) };
   } catch (caught: unknown) {

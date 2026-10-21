@@ -28,6 +28,8 @@ export async function loadCommunityList<T>({
   onWaiting,
   read,
 }: LoadCommunityListOptions<T>): Promise<void> {
+  if (!load.isCurrent()) return;
+
   let communities: T[];
 
   try {
