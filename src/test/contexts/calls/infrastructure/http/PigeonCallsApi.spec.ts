@@ -1,5 +1,3 @@
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
-
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
@@ -194,69 +192,65 @@ describe(PigeonCallsApi.name, () => {
     /**
      * A page that is being torn down cancels every ordinary request it still
      * has in flight; only a keepalive request dispatched before the teardown
-     * reaches the node. The departure must therefore not wait for a revision
-     * read, which here never answers.
+     * reaches the node. The departure must therefore sign without waiting for
+     * anything, here an ordinary signature that never settles.
      */
-    async function departing() {
-      const device = await KeyPair.generate();
-      const departingSession = {
-        deviceCredentialKeyPair: device,
-        identity: { id: 'identity-a' },
-      } as unknown as Session;
-      const request = jest.fn().mockResolvedValue(undefined);
-      const current = jest.fn(() => new Promise<number>(() => undefined));
-      const signer = {
-        headers: jest.fn().mockResolvedValue({}),
-      } as unknown as RequestSigner;
-      const api = new PigeonCallsApi(
-        { request } as unknown as HttpJsonClient,
-        signer,
-        new CallEventSigner(
-          new PublicMutationSigner({ current, observed: () => 4 }),
-        ),
-        { communityNetworkId: jest.fn(), conversation: jest.fn() },
-      );
+    function departing() {
+      const built = build([undefined]);
+      const pending = () => new Promise<never>(() => undefined);
 
-      return { api, current, departingSession, request };
+      jest.spyOn(built.events, 'participant').mockImplementation(pending);
+      jest.spyOn(built.events, 'end').mockImplementation(pending);
+
+      return built;
     }
 
-    it.each([true, false])(
-      'dispatches a keepalive leave with declined=%s without a revision read',
-      async (declined) => {
-        const { api, current, departingSession, request } = await departing();
+    it.each([
+      [true, 'declined'],
+      [false, 'left'],
+    ] as const)(
+      'dispatches a keepalive leave with declined=%s at once',
+      async (declined, state) => {
+        const { api, events, request } = departing();
+        const sign = jest
+          .spyOn(events, 'participantOnPageDeparture')
+          .mockReturnValue(mutation);
 
-        void api.leaveOnPageDeparture(departingSession, 'call-a', 6, declined);
+        void api.leaveOnPageDeparture(session, 'call-a', 6, declined);
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(current).not.toHaveBeenCalled();
+        expect(sign).toHaveBeenCalledWith(
+          session,
+          'call-a',
+          state,
+          6,
+          PublicMutationSigner.FIRST_POSITION,
+        );
         expect(request).toHaveBeenCalledTimes(1);
         expect(request.mock.calls[0]).toEqual([
           '/calls/call-a/participants/me',
           expect.objectContaining({ keepalive: true, method: 'DELETE' }),
         ]);
-        expect(bodyOf(request, 0)).toMatchObject({
-          at: 6,
-          mutation: { author: { authorizationRevision: 4 } },
-        });
+        expect(bodyOf(request, 0)).toEqual({ at: 6, mutation });
       },
     );
 
-    it('dispatches a keepalive end without a revision read', async () => {
-      const { api, current, departingSession, request } = await departing();
+    it('dispatches a keepalive end at once', async () => {
+      const { api, events, request } = departing();
+      const sign = jest
+        .spyOn(events, 'endOnPageDeparture')
+        .mockReturnValue(mutation);
 
-      void api.endOnPageDeparture(departingSession, 'call-a', 8);
+      void api.endOnPageDeparture(session, 'call-a', 8);
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(current).not.toHaveBeenCalled();
+      expect(sign).toHaveBeenCalledWith(session, 'call-a', 8);
       expect(request).toHaveBeenCalledTimes(1);
       expect(request.mock.calls[0]).toEqual([
         '/calls/call-a',
         expect.objectContaining({ keepalive: true, method: 'DELETE' }),
       ]);
-      expect(bodyOf(request, 0)).toMatchObject({
-        at: 8,
-        mutation: { author: { authorizationRevision: 4 } },
-      });
+      expect(bodyOf(request, 0)).toEqual({ at: 8, mutation });
     });
   });
 

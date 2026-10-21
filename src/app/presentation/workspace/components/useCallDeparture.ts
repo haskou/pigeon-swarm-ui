@@ -100,7 +100,10 @@ export function useCallDeparture({
       departureRequested = true;
       const request =
         pending.action === 'end'
-          ? applicationContainer.calls.end(currentSession, pending.callId)
+          ? applicationContainer.calls.endOnPageDeparture(
+              currentSession,
+              pending.callId,
+            )
           : applicationContainer.calls.leaveOnPageDeparture(
               currentSession,
               pending.callId,

@@ -21,6 +21,7 @@ describe(PublicMutationSigner.name, () => {
     } as unknown as Session;
     const signer = new PublicMutationSigner({
       current: () => Promise.resolve(7),
+      observed: () => 7,
     });
     const mutation = await signer.sign(
       session,
@@ -68,6 +69,7 @@ describe(PublicMutationSigner.name, () => {
     } as unknown as Session;
     const signer = new PublicMutationSigner({
       current: () => Promise.resolve(1),
+      observed: () => 1,
     });
     const intent = {
       kind: 'put' as const,
@@ -97,7 +99,7 @@ describe(PublicMutationSigner.name, () => {
       identity: { id: 'identity-1' },
     } as unknown as Session;
     const current = jest.fn().mockResolvedValueOnce(4).mockResolvedValueOnce(5);
-    const signer = new PublicMutationSigner({ current });
+    const signer = new PublicMutationSigner({ current, observed: () => 4 });
     const draft = {
       kind: 'put' as const,
       payload: { a: 1 },

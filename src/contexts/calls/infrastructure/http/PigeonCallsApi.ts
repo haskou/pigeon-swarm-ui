@@ -83,6 +83,23 @@ export class PigeonCallsApi {
     );
   }
 
+  /**
+   * A keepalive request is the only kind a browser still delivers once the
+   * page that sent it is gone.
+   */
+  private async deleteWithKeepalive(
+    session: Session,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<void> {
+    await this.http.request(path, {
+      body: JSON.stringify(body),
+      headers: await this.signer.headers(session, 'DELETE', path, body),
+      keepalive: true,
+      method: 'DELETE',
+    });
+  }
+
   public async list(session: Session): Promise<CallResource[]> {
     const path = '/calls';
     const pages = await readAllPages<CallsResource>(async (cursor) => {
@@ -224,14 +241,36 @@ export class PigeonCallsApi {
       declined ? 'declined' : 'left',
       at,
       async (mutation) => {
-        const body = { at, mutation };
+        await this.deleteWithKeepalive(session, path, { at, mutation });
+      },
+    );
+  }
 
-        await this.http.request(path, {
-          body: JSON.stringify(body),
-          headers: await this.signer.headers(session, 'DELETE', path, body),
-          keepalive: true,
-          method: 'DELETE',
-        });
+  /**
+   * Leaves from a page being torn down, which cancels every request it starts
+   * that is not keepalive: the mutation is signed without asking the node for
+   * the authorization revision first.
+   */
+  public async leaveOnPageDeparture(
+    session: Session,
+    callId: string,
+    at: number,
+    declined: boolean,
+  ): Promise<void> {
+    const path = `/calls/${encodeURIComponent(callId)}/participants/me`;
+
+    await submitPublicMutation(
+      PublicMutationSigner.FIRST_POSITION,
+      (position) =>
+        this.events.participantOnPageDeparture(
+          session,
+          callId,
+          declined ? 'declined' : 'left',
+          at,
+          position,
+        ),
+      async (mutation) => {
+        await this.deleteWithKeepalive(session, path, { at, mutation });
       },
     );
   }
@@ -264,6 +303,24 @@ export class PigeonCallsApi {
       headers: await this.signer.headers(session, 'DELETE', path, body),
       method: 'DELETE',
     });
+  }
+
+  /**
+   * Ends from a page being torn down: see `leaveOnPageDeparture`.
+   */
+  public async endOnPageDeparture(
+    session: Session,
+    callId: string,
+    at: number,
+  ): Promise<void> {
+    await this.deleteWithKeepalive(
+      session,
+      `/calls/${encodeURIComponent(callId)}`,
+      {
+        at,
+        mutation: this.events.endOnPageDeparture(session, callId, at),
+      },
+    );
   }
 
   public async sendSignal(

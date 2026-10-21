@@ -2,6 +2,7 @@ import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 
 import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 
+import type { PublicMutationIntent } from '../../../../shared/infrastructure/crypto/PublicMutationIntent';
 import type { PublicMutationPosition } from '../../../../shared/infrastructure/crypto/PublicMutationPosition';
 import type { Session } from '../../../identities/infrastructure/session/Session';
 
@@ -35,17 +36,46 @@ export interface SignedCallStart {
 export class CallEventSigner {
   public constructor(private readonly mutations: PublicMutationSigner) {}
 
-  private async sign(
-    session: Session,
+  private intent(
     recordId: string,
     payload: Record<string, unknown>,
-    position: PublicMutationPosition,
-  ): Promise<PublicMutation> {
-    return await this.mutations.sign(
-      session,
-      { kind: 'put', payload, recordId, store: 'calls' },
-      position,
-    );
+  ): PublicMutationIntent {
+    return { kind: 'put', payload, recordId, store: 'calls' };
+  }
+
+  private participantIntent(
+    session: Session,
+    callId: string,
+    state: CallParticipantState,
+    at: number,
+  ): PublicMutationIntent {
+    const identityId = this.mutations.authorOf(session);
+    const id = `call-participant:${callId}:${identityId}`;
+
+    return this.intent(id, {
+      at,
+      callId,
+      id,
+      identityId,
+      scopeType: 'call_participant',
+      state,
+    });
+  }
+
+  private endIntent(
+    session: Session,
+    callId: string,
+    at: number,
+  ): PublicMutationIntent {
+    const id = `call-end:${callId}`;
+
+    return this.intent(id, {
+      at,
+      callId,
+      endedByIdentityId: this.mutations.authorOf(session),
+      id,
+      scopeType: 'call_end',
+    });
   }
 
   /** Random client nonce, matching ^[A-Za-z0-9_-]{16,128}$. */
@@ -84,10 +114,9 @@ export class CallEventSigner {
 
     return {
       callId,
-      mutation: await this.sign(
+      mutation: await this.mutations.sign(
         session,
-        id,
-        payload,
+        this.intent(id, payload),
         PublicMutationSigner.FIRST_POSITION,
       ),
     };
@@ -100,20 +129,24 @@ export class CallEventSigner {
     at: number,
     position: PublicMutationPosition,
   ): Promise<PublicMutation> {
-    const identityId = this.mutations.authorOf(session);
-    const id = `call-participant:${callId}:${identityId}`;
-
-    return await this.sign(
+    return await this.mutations.sign(
       session,
-      id,
-      {
-        at,
-        callId,
-        id,
-        identityId,
-        scopeType: 'call_participant',
-        state,
-      },
+      this.participantIntent(session, callId, state, at),
+      position,
+    );
+  }
+
+  /** Signs without any request: see `signAtObservedRevision`. */
+  public participantOnPageDeparture(
+    session: Session,
+    callId: string,
+    state: CallParticipantState,
+    at: number,
+    position: PublicMutationPosition,
+  ): PublicMutation {
+    return this.mutations.signAtObservedRevision(
+      session,
+      this.participantIntent(session, callId, state, at),
       position,
     );
   }
@@ -123,18 +156,22 @@ export class CallEventSigner {
     callId: string,
     at: number,
   ): Promise<PublicMutation> {
-    const id = `call-end:${callId}`;
-
-    return await this.sign(
+    return await this.mutations.sign(
       session,
-      id,
-      {
-        at,
-        callId,
-        endedByIdentityId: this.mutations.authorOf(session),
-        id,
-        scopeType: 'call_end',
-      },
+      this.endIntent(session, callId, at),
+      PublicMutationSigner.FIRST_POSITION,
+    );
+  }
+
+  /** Signs without any request: see `signAtObservedRevision`. */
+  public endOnPageDeparture(
+    session: Session,
+    callId: string,
+    at: number,
+  ): PublicMutation {
+    return this.mutations.signAtObservedRevision(
+      session,
+      this.endIntent(session, callId, at),
       PublicMutationSigner.FIRST_POSITION,
     );
   }
