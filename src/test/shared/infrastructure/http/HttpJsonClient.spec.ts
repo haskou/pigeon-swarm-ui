@@ -1,4 +1,5 @@
 import { ApiUrlBuilder } from '../../../../shared/infrastructure/http/ApiUrlBuilder';
+import { HttpConnectionError } from '../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -149,5 +150,33 @@ describe(HttpJsonClient.name, () => {
         '404 Not Found · {"code":"KeychainNotFoundError","message":"Not found"}',
       status: 404,
     } satisfies Partial<HttpJsonError>);
+  });
+
+  it('reports a request that never reached the node as a connection error', async () => {
+    const refused = new TypeError('Failed to fetch');
+    global.fetch = jest.fn().mockRejectedValue(refused);
+    const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+    const request = client.request('/communities');
+
+    await expect(request).rejects.toBeInstanceOf(HttpConnectionError);
+    await expect(request).rejects.toBeInstanceOf(TypeError);
+    await expect(request).rejects.toMatchObject({ cause: refused });
+  });
+
+  it('reports a blob request that never reached the node as a connection error', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Load failed'));
+    const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+
+    await expect(client.requestBlob('/files/abc')).rejects.toBeInstanceOf(
+      HttpConnectionError,
+    );
+  });
+
+  it('passes an aborted request through unchanged', async () => {
+    const aborted = new DOMException('The user aborted.', 'AbortError');
+    global.fetch = jest.fn().mockRejectedValue(aborted);
+    const client = new HttpJsonClient(new ApiUrlBuilder('http://localhost'));
+
+    await expect(client.request('/communities')).rejects.toBe(aborted);
   });
 });

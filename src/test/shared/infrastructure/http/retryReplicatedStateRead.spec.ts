@@ -1,3 +1,4 @@
+import { HttpConnectionError } from '../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import {
   isNodeStarting,
@@ -132,14 +133,14 @@ describe(retryReplicatedStateRead.name, () => {
   });
 
   it('also reads again on a failure the caller marks as retriable', async () => {
-    const refused = new TypeError('Failed to fetch');
+    const refused = new HttpConnectionError(new TypeError('Failed to fetch'));
     const read = jest
       .fn()
       .mockRejectedValueOnce(refused)
       .mockRejectedValueOnce(notReadyError())
       .mockResolvedValueOnce('value');
     const isRetriable = jest.fn(
-      (caught: unknown) => caught instanceof TypeError,
+      (caught: unknown) => caught instanceof HttpConnectionError,
     );
     const pending = retryReplicatedStateRead(read, { isRetriable });
 
@@ -152,7 +153,10 @@ describe(retryReplicatedStateRead.name, () => {
 
   describe(isNodeStarting.name, () => {
     it.each([
-      ['a refused connection', new TypeError('Failed to fetch')],
+      [
+        'a refused connection',
+        new HttpConnectionError(new TypeError('Failed to fetch')),
+      ],
       ['a proxy 502', new HttpJsonError(502, 'Bad Gateway', '')],
       ['an uncoded 503', new HttpJsonError(503, 'Service Unavailable', '')],
     ])('marks %s as a node that is starting', (_label, caught) => {
@@ -166,6 +170,10 @@ describe(retryReplicatedStateRead.name, () => {
       ],
       ['a 500', new HttpJsonError(500, 'Server Error', '')],
       ['another error', new Error('offline')],
+      [
+        'a TypeError thrown before any request was sent',
+        new TypeError('Cannot read properties of undefined'),
+      ],
     ])('does not mark %s as a node that is starting', (_label, caught) => {
       expect(isNodeStarting(caught)).toBe(false);
     });

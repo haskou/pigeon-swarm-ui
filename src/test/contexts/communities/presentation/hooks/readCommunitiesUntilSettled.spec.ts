@@ -1,5 +1,6 @@
 import { CommunityListNotSettledError } from '../../../../../contexts/communities/presentation/hooks/CommunityListNotSettledError';
 import { readCommunitiesUntilSettled } from '../../../../../contexts/communities/presentation/hooks/readCommunitiesUntilSettled';
+import { HttpConnectionError } from '../../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const community = { id: 'community-1' } as never;
@@ -84,7 +85,9 @@ describe('readCommunitiesUntilSettled', () => {
   it('keeps reading past a node that refuses connections or whose proxy answers 502/503 while it starts', async () => {
     const read = jest
       .fn()
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(
+        new HttpConnectionError(new TypeError('Failed to fetch')),
+      )
       .mockRejectedValueOnce(new HttpJsonError(502, 'Bad Gateway', ''))
       .mockRejectedValueOnce(new HttpJsonError(503, 'Service Unavailable', ''))
       .mockResolvedValueOnce([community]);
