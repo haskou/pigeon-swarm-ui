@@ -4,9 +4,6 @@ import {
   KeyPair,
   PrivateKey,
   PublicKey,
-  RecoveryKey,
-  RecoveryKit,
-  SymmetricKey,
   UserRootKey,
 } from '@haskou/pigeon-swarm-crypto';
 
@@ -128,93 +125,6 @@ export class PigeonIdentityCommandsApi {
     password: string,
   ): Promise<void> {
     await this.vault.confirmUnlock(IdentityId.fromString(identityId), password);
-  }
-
-  public async create(
-    name: string,
-    password: string,
-    networks: string[],
-    handle?: string,
-    options: { recoveryKey?: string } = {},
-  ): Promise<CreatedIdentityMaterial> {
-    const recoveryKey = RecoveryKey.fromString(options.recoveryKey ?? '');
-    const recovered = RecoveryKit.derive(recoveryKey);
-    const keyPair = recovered.identityKeyPair;
-    const deviceCredentialKeyPair = await KeyPair.generate();
-    const recoveryAuthorityKeyPair = recovered.recoveryAuthorityKeyPair;
-    const rootKey = recovered.rootKey;
-    const masterKey = SymmetricKey.fromBuffer(rootKey.getBuffer());
-    const identityId = IdentityId.normalize(keyPair.toPrimitives().publicKey);
-    const vaultSession = await this.vault.register({
-      firstKeychainPublish: 'armed',
-      identityId: IdentityId.fromString(identityId),
-      material: {
-        deviceCredentialKeyPair,
-        identityKeyPair: keyPair,
-        recoveryAuthorityKeyPair,
-        rootKey,
-      },
-      password,
-    });
-    const path = '/identities';
-    let identity: IdentityResource;
-
-    try {
-      identity = await this.publishAdmitted(async (admissionDifficultyBits) => {
-        const unsigned = await this.signatures.createInitial({
-          admissionDifficultyBits,
-          deviceCredential: deviceCredentialKeyPair.toPrimitives().publicKey,
-          deviceCredentialCommitment: this.credentialCommitment(
-            deviceCredentialKeyPair,
-          ),
-          id: identityId,
-          networks,
-          profile: { handle, name },
-          recoveryAuthority: recoveryAuthorityKeyPair.toPrimitives().publicKey,
-          timestamp: Date.now(),
-        });
-        const body = {
-          ...unsigned,
-          signature: this.signIdentity(unsigned, keyPair),
-        };
-        const signingSession = {
-          authorizationEpoch: vaultSession.authorizationEpoch,
-          authorizationRevision: vaultSession.authorizationRevision,
-          deviceCredentialKeyPair,
-          deviceId: vaultSession.deviceId,
-          identity: body,
-          keychain: emptyKeychain,
-          keyPair,
-          masterKey,
-          recoveryAuthorityKeyPair,
-        } as Session;
-
-        return await this.http.request<IdentityResource>(path, {
-          body: JSON.stringify(body),
-          headers: await this.signer.headers(
-            signingSession,
-            'POST',
-            path,
-            body,
-          ),
-          method: 'POST',
-        });
-      });
-    } catch (error) {
-      await this.vault.delete(IdentityId.fromString(identityId));
-      throw error;
-    }
-
-    return {
-      authorizationEpoch: vaultSession.authorizationEpoch,
-      authorizationRevision: vaultSession.authorizationRevision,
-      deviceCredentialKeyPair,
-      deviceId: vaultSession.deviceId,
-      identity,
-      keyPair,
-      masterKey,
-      recoveryAuthorityKeyPair,
-    };
   }
 
   public async createIdentity(

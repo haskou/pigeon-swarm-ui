@@ -10,6 +10,7 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
+import type { CreatedIdentityMaterial } from '../../../../../contexts/identities/infrastructure/http/CreatedIdentityMaterial';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
@@ -63,6 +64,39 @@ function expectIdentitySigned(http: HttpJsonClient, keyPair: KeyPair): void {
   ).not.toThrow();
 }
 
+async function createIdentityThrough(
+  commands: PigeonIdentityCommandsApi,
+  code: IdentityRegistrationCode | null = null,
+): Promise<CreatedIdentityMaterial> {
+  const keyPair = await KeyPair.generate();
+
+  return await commands.createIdentity(
+    Identity.create(
+      IdentityId.fromString(keyPair.toPrimitives().publicKey),
+      IdentityProfile.fromPrimitives({
+        banner: undefined,
+        biography: undefined,
+        handle: undefined,
+        name: 'Ada',
+        picture: undefined,
+      }),
+      IdentityNetworkMemberships.fromPrimitives(['network-1']),
+      new Timestamp(100),
+    ),
+    {
+      deviceCredentialKeyPair: await KeyPair.generate(),
+      keyPair,
+      masterKey: SymmetricKey.generate(),
+      recoveryAuthorityKeyPair: await KeyPair.generate(),
+    },
+    IdentityMasterKeyProtection.fromPrimitives({
+      password: 'Correct-Horse-Battery-9!',
+      recoveryKey: RecoveryKey.generate().valueOf(),
+    }),
+    code,
+  );
+}
+
 describe(PigeonIdentityCommandsApi.name, () => {
   it('creates and signs identity material through the identity boundary', async () => {
     const createdIdentity = identity();
@@ -92,13 +126,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       vault,
     );
 
-    const created = await commands.create(
-      'Ada',
-      'password',
-      ['network-1'],
-      '@ada',
-      { recoveryKey: RecoveryKey.generate().valueOf() },
-    );
+    const created = await createIdentityThrough(commands);
 
     expect(created).toMatchObject({
       authorizationEpoch: expect.any(Object),
@@ -262,9 +290,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const progress = jest.fn();
     const stop = commands.watchAdmissionProgress(progress);
 
-    await commands.create('Ada', 'password', ['network-1'], undefined, {
-      recoveryKey: RecoveryKey.generate().valueOf(),
-    });
+    await createIdentityThrough(commands);
     stop();
 
     const retried = sentBody(http, 1);
@@ -340,13 +366,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const deviceVault = vault();
 
     await expect(
-      commandsWith(http, undefined, deviceVault).create(
-        'Ada',
-        'password',
-        ['network-1'],
-        undefined,
-        { recoveryKey: RecoveryKey.generate().valueOf() },
-      ),
+      createIdentityThrough(commandsWith(http, undefined, deviceVault)),
     ).rejects.toBe(refusal);
     expect(http.request).toHaveBeenCalledTimes(3);
     expect(deviceVault.delete).toHaveBeenCalledTimes(1);
@@ -361,11 +381,9 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
 
     mine.mockResolvedValue('1');
 
-    await expect(
-      commandsWith(http).create('Ada', 'password', ['network-1'], undefined, {
-        recoveryKey: RecoveryKey.generate().valueOf(),
-      }),
-    ).rejects.toBe(refusal);
+    await expect(createIdentityThrough(commandsWith(http))).rejects.toBe(
+      refusal,
+    );
     expect(http.request).toHaveBeenCalledTimes(1);
     expect(mine).toHaveBeenCalledTimes(1);
   });
@@ -379,40 +397,16 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     deviceVault: DeviceIdentityVault,
     code: IdentityRegistrationCode | null,
   ): Promise<unknown> {
-    const keyPair = await KeyPair.generate();
-    const commands = new PigeonIdentityCommandsApi(
-      http,
-      {
-        headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
-      } as unknown as RequestSigner,
-      new PigeonIdentityGateway(http),
-      new IdentitySignaturePayloadFactory(),
-      deviceVault,
-    );
-
-    return await commands.createIdentity(
-      Identity.create(
-        IdentityId.fromString(keyPair.toPrimitives().publicKey),
-        IdentityProfile.fromPrimitives({
-          banner: undefined,
-          biography: undefined,
-          handle: undefined,
-          name: 'Ada',
-          picture: undefined,
-        }),
-        IdentityNetworkMemberships.fromPrimitives(['network-1']),
-        new Timestamp(100),
+    return await createIdentityThrough(
+      new PigeonIdentityCommandsApi(
+        http,
+        {
+          headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+        } as unknown as RequestSigner,
+        new PigeonIdentityGateway(http),
+        new IdentitySignaturePayloadFactory(),
+        deviceVault,
       ),
-      {
-        deviceCredentialKeyPair: await KeyPair.generate(),
-        keyPair,
-        masterKey: SymmetricKey.generate(),
-        recoveryAuthorityKeyPair: await KeyPair.generate(),
-      },
-      IdentityMasterKeyProtection.fromPrimitives({
-        password: 'Correct-Horse-Battery-9!',
-        recoveryKey: RecoveryKey.generate().valueOf(),
-      }),
       code,
     );
   }

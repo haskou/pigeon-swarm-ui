@@ -322,24 +322,6 @@ export class PigeonIdentitiesGateway {
     await this.identityCommands.confirmLocalUnlock(identityId, password);
   }
 
-  public async createIdentity(
-    name: string,
-    password: string,
-    networks: string[],
-    handle?: string,
-    options: { recoveryKey?: string } = {},
-  ): Promise<IdentityResource> {
-    return (
-      await this.identityCommands.create(
-        name,
-        password,
-        networks,
-        handle,
-        options,
-      )
-    ).identity;
-  }
-
   public async createIdentityAggregate(
     identity: Identity,
     material: IdentityCreationMaterial,
