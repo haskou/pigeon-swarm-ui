@@ -171,4 +171,18 @@ describe('loadCommunityList', () => {
 
     expect(out.onFailed).toHaveBeenCalledWith(expect.any(Error));
   });
+
+  it('starts no read for a load that was cancelled before it began', async () => {
+    const loads = new CommunityListLoads();
+    const out = sinks();
+    const read = jest.fn().mockResolvedValue([community]);
+    const load = loads.begin('identity-a');
+
+    loads.cancel();
+    await loadCommunityList({ ...out, delaysMs: [1], load, read });
+
+    expect(read).not.toHaveBeenCalled();
+    expect(out.onSettled).not.toHaveBeenCalled();
+    expect(out.onFailed).not.toHaveBeenCalled();
+  });
 });

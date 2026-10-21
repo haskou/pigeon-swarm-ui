@@ -152,4 +152,21 @@ describe('readCommunitiesUntilSettled', () => {
       }),
     ).rejects.toBeInstanceOf(HttpJsonError);
   });
+
+  it('starts no read when it is already aborted', async () => {
+    const controller = new AbortController();
+    const read = jest.fn().mockResolvedValue([]);
+
+    controller.abort(new Error('stop'));
+
+    await expect(
+      readCommunitiesUntilSettled({
+        delaysMs,
+        hadCommunities: true,
+        read,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow('stop');
+    expect(read).not.toHaveBeenCalled();
+  });
 });
