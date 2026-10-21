@@ -28,11 +28,10 @@ import {
   NodeAccessSection,
   NodeAccessStatus,
 } from './NodeAccessParts';
+import { nodeBlockFetchOutcomeLabel } from './nodeBlockFetchOutcomeLabel';
 import { useNodeAccessAction } from './useNodeAccessAction';
 
 type NodeBlockTargetKind = 'identity' | 'node';
-
-const fetchOutcomes: Record<string, string> = copy.nodeAccess.fetchOutcomes;
 
 function sourceDiagnostics(source: NodeBlockSourceViewModel): string {
   if (source.lastFetchedAt === null) return copy.nodeAccess.neverChecked;
@@ -41,7 +40,7 @@ function sourceDiagnostics(source: NodeBlockSourceViewModel): string {
     .replace('{date}', formatNodeAccessDate(source.lastFetchedAt))
     .replace(
       '{outcome}',
-      (source.lastFetchOutcome && fetchOutcomes[source.lastFetchOutcome]) ??
+      nodeBlockFetchOutcomeLabel(source.lastFetchOutcome) ??
         copy.nodeAccess.neverChecked,
     );
 }

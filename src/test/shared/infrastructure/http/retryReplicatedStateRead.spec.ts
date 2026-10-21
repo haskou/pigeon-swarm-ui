@@ -159,6 +159,7 @@ describe(retryReplicatedStateRead.name, () => {
       ],
       ['a proxy 502', new HttpJsonError(502, 'Bad Gateway', '')],
       ['an uncoded 503', new HttpJsonError(503, 'Service Unavailable', '')],
+      ['a proxy 504', new HttpJsonError(504, 'Gateway Timeout', '')],
     ])('marks %s as a node that is starting', (_label, caught) => {
       expect(isNodeStarting(caught)).toBe(true);
     });
