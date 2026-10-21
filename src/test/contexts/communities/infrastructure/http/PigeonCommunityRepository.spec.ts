@@ -57,6 +57,21 @@ describe(PigeonCommunityRepository.name, () => {
     expect(gateway.getCommunity).toHaveBeenCalledWith(session, 'community-a');
   });
 
+  it('searches the communities of the actor with the abort signal of the read', async () => {
+    const { gateway, repository } = setup();
+    const { signal } = new AbortController();
+    gateway.listCommunities = jest.fn().mockResolvedValue([resource()]);
+
+    const communities = await repository.search(actorIdentityId, { signal });
+
+    expect(
+      communities.map(
+        (community) => new CommunityMapper().toResource(community).id,
+      ),
+    ).toEqual(['community-a']);
+    expect(gateway.listCommunities).toHaveBeenCalledWith(session, { signal });
+  });
+
   it('serializes aggregate profile state at the HTTP boundary', async () => {
     const { gateway, repository } = setup();
     const mapper = new CommunityMapper();
