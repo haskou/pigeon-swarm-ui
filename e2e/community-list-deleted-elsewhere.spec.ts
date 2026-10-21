@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import {
   claimInviteLink,
@@ -19,25 +19,6 @@ const SLOW = 240_000;
 // The list is read again for up to 60 s before an empty answer is reported
 // for a device that listed communities, plus the last read.
 const SETTLE_WINDOW_MS = 120_000;
-
-// Opens the app again. A reload may keep the unlocked session, which reads the
-// community list on its own; otherwise the login screen shows the remembered
-// identity and the password signs in.
-async function reopen(page: Page, password: string): Promise<void> {
-  await page.goto('/');
-  const remembered = page.getByTestId('auth-identity-preview');
-  const workspace = page
-    .getByRole('button', { name: /Add community/i })
-    .first();
-
-  await expect(remembered.or(workspace).first()).toBeVisible({
-    timeout: SLOW,
-  });
-  if (await remembered.isVisible()) {
-    await page.getByTestId('auth-password-input').fill(password);
-    await page.getByTestId('auth-submit-button').click();
-  }
-}
 
 test('a device whose communities were all left on another device continues without them', async ({
   browser,
@@ -112,7 +93,7 @@ test('a device whose communities were all left on another device continues witho
     // The node settles an empty list for the laptop, which the laptop cannot
     // tell from a node still opening its state: it reports the list as not
     // settled, never as empty, and offers to continue without communities.
-    await reopen(laptop, password);
+    await loginIdentity(laptop, `@${memberHandle}`, password);
     await laptop
       .getByText(NOT_SETTLED)
       .filter({ visible: true })
@@ -133,7 +114,7 @@ test('a device whose communities were all left on another device continues witho
     await expect(laptop.getByText(NOT_SETTLED)).toHaveCount(0);
 
     // The choice holds: the next sign-in settles the empty list at once.
-    await reopen(laptop, password);
+    await loginIdentity(laptop, `@${memberHandle}`, password);
     await laptop
       .getByText(EMPTY_LIST)
       .filter({ visible: true })
