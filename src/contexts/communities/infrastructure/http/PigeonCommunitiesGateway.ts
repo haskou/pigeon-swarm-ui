@@ -51,8 +51,11 @@ export class PigeonCommunitiesGateway {
     return await this.media.uploadPublicFile(session, file);
   }
 
-  public async listCommunities(session: Session): Promise<Community[]> {
-    return await this.communities.list(session);
+  public async listCommunities(
+    session: Session,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<Community[]> {
+    return await this.communities.list(session, options);
   }
 
   public async getCommunity(

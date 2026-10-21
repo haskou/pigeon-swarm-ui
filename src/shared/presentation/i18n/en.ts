@@ -397,6 +397,7 @@ export const en = {
     confirmDeleteChannel: 'Confirm delete',
     confirmDeleteRole: 'Confirm delete',
     confirmKickMember: 'Confirm kick',
+    continueWithoutCommunities: 'Continue without communities',
     create: 'Create community',
     createBody:
       'Create a community inside one of your networks. You can define its visibility, initial channels and join permissions.',
@@ -444,24 +445,24 @@ export const en = {
       'Add the channels that will be created with the community.',
     invalidChannelName:
       'Use 1-32 characters: letters, numbers, dashes or underscores.',
+    invitations: 'Invitations',
     inviteLinkClosed: 'Closed',
     inviteLinkLive: 'Active',
     inviteLinkRevoke: 'Revoke',
-    inviteLinkRevokeError: 'The invite link could not be revoked.',
     inviteLinkRevoked: 'Revoked',
+    inviteLinkRevokeError: 'The invite link could not be revoked.',
     inviteLinks: 'Invite links',
     inviteOpenConsent:
       'Joining signs a request with your identity. A community manager then has to admit you.',
     inviteOpenDescription: 'You were invited to join a community.',
     inviteOpenError: 'The request to join could not be sent.',
-    inviteOpenInvalid: 'This invite link is invalid, expired or already used up.',
+    inviteOpenInvalid:
+      'This invite link is invalid, expired or already used up.',
     inviteOpenJoin: 'Request to join',
     inviteOpenPreviewing: 'Checking the invite link...',
     inviteOpenTitle: 'Community invitation',
     inviteOpenWaiting:
       'Waiting for a community manager to admit you. This page updates when you are in.',
-    invitations: 'Invitations',
-    noInviteLinks: 'No invite links yet.',
     kickMember: 'Kick',
     kickMemberError: 'The member could not be kicked.',
     leave: 'Leave community',
@@ -474,10 +475,10 @@ export const en = {
     linkExpiryDays: '{count} days',
     linkHelp:
       'Creates a signed invite link for people you share it with. A community manager admits each person who opens it.',
+    linkInvite: 'Create invite link',
     linkInvitee: 'Reserve for a contact (optional)',
     linkInviteeHelp:
       'Only this identity can use a single-use link reserved for it.',
-    linkInvite: 'Create invite link',
     linkMaxUses: 'Maximum uses',
     loadError: 'Communities could not be loaded.',
     loadMoreModerationLogs: 'Load more',
@@ -568,12 +569,15 @@ export const en = {
     noChannelSelectedBody:
       'Community channels are private spaces inside this community.',
     noCustomRoles: 'Create a custom role to assign it to members.',
+    noInviteLinks: 'No invite links yet.',
     noMatchingChannels: 'No channels match that search.',
     noMatchingMembers: 'No members match that search.',
     noMembershipRequests: 'No invitations or join requests yet.',
     noModerationLogs: 'No moderation logs yet.',
     noPrivateNetwork:
       'No private network is available. Private communities can only be created inside a private network.',
+    notSettled:
+      'This device listed communities for you, but the node still lists none. They may have been left or deleted on another device, or the node may still be opening them.',
     openAvatar: 'Open community avatar',
     openBanner: 'Open community banner',
     owner: 'Owner',

@@ -117,8 +117,11 @@ export class PigeonCommunitiesFacade {
     return (await this.media.uploadPublicFile(session, value)).cid;
   }
 
-  public async list(session: Session): Promise<Community[]> {
-    return await this.management.search(session);
+  public async list(
+    session: Session,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<Community[]> {
+    return await this.management.search(session, options);
   }
 
   public async get(session: Session, communityId: string): Promise<Community> {

@@ -403,6 +403,7 @@ export const es = {
     confirmDeleteChannel: 'Confirmar borrado',
     confirmDeleteRole: 'Confirmar borrado',
     confirmKickMember: 'Confirmar expulsión',
+    continueWithoutCommunities: 'Continuar sin comunidades',
     create: 'Crear comunidad',
     createBody:
       'Crea una comunidad dentro de una de tus redes. Puedes definir su visibilidad, canales iniciales y permisos de unión.',
@@ -450,11 +451,12 @@ export const es = {
       'Añade los canales que se crearán junto con la comunidad.',
     invalidChannelName:
       'Usa 1-32 caracteres: letras, números, guiones o guiones bajos.',
+    invitations: 'Invitaciones',
     inviteLinkClosed: 'Cerrado',
     inviteLinkLive: 'Activo',
     inviteLinkRevoke: 'Revocar',
-    inviteLinkRevokeError: 'No se pudo revocar el enlace de invitación.',
     inviteLinkRevoked: 'Revocado',
+    inviteLinkRevokeError: 'No se pudo revocar el enlace de invitación.',
     inviteLinks: 'Enlaces de invitación',
     inviteOpenConsent:
       'Unirte firma una solicitud con tu identidad. Después, un gestor de la comunidad tiene que admitirte.',
@@ -467,8 +469,6 @@ export const es = {
     inviteOpenTitle: 'Invitación a una comunidad',
     inviteOpenWaiting:
       'Esperando a que un gestor de la comunidad te admita. Esta página se actualiza cuando entres.',
-    invitations: 'Invitaciones',
-    noInviteLinks: 'Todavía no hay enlaces de invitación.',
     kickMember: 'Expulsar',
     kickMemberError: 'No se pudo expulsar al miembro.',
     leave: 'Salir de la comunidad',
@@ -481,10 +481,10 @@ export const es = {
     linkExpiryDays: '{count} días',
     linkHelp:
       'Crea un enlace de invitación firmado para quienes lo reciban. Un gestor de la comunidad admite a cada persona que lo abre.',
+    linkInvite: 'Crear enlace de invitación',
     linkInvitee: 'Reservar para un contacto (opcional)',
     linkInviteeHelp:
       'Solo esta identidad puede usar un enlace de un solo uso reservado para ella.',
-    linkInvite: 'Crear enlace de invitación',
     linkMaxUses: 'Usos máximos',
     loadError: 'No se pudieron cargar las comunidades.',
     loadMoreModerationLogs: 'Cargar más',
@@ -575,12 +575,15 @@ export const es = {
     noChannelSelectedBody:
       'Los canales de comunidad son espacios privados dentro de la comunidad.',
     noCustomRoles: 'Crea un rol personalizado para asignarlo a miembros.',
+    noInviteLinks: 'Todavía no hay enlaces de invitación.',
     noMatchingChannels: 'Ningún canal coincide con la búsqueda.',
     noMatchingMembers: 'Ningún miembro coincide con la búsqueda.',
     noMembershipRequests: 'Aún no hay invitaciones ni solicitudes.',
     noModerationLogs: 'Aún no hay registros de moderación.',
     noPrivateNetwork:
       'No hay una red privada disponible. Las comunidades privadas solo se pueden crear dentro de una red privada.',
+    notSettled:
+      'Este dispositivo mostró comunidades tuyas, pero el nodo todavía no muestra ninguna. Puede que se abandonaran o borraran en otro dispositivo, o que el nodo aún las esté abriendo.',
     openAvatar: 'Abrir avatar de comunidad',
     openBanner: 'Abrir banner de comunidad',
     owner: 'Propietario',
