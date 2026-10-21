@@ -1,6 +1,9 @@
 import type { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';
-import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
+import type {
+  DeviceIdentityVaultRecord,
+  FirstKeychainPublishState,
+} from './DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultStore as VaultStore } from './DeviceIdentityVaultStore';
 
 import { scopeClientStorageKey } from '../../../../shared/infrastructure/storage/ClientStorageScope';
@@ -114,6 +117,48 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     );
   }
 
+  public async setFirstKeychainPublish(
+    identityId: IdentityId,
+    state: FirstKeychainPublishState,
+  ): Promise<void> {
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(identityId.valueOf());
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const record = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          if (record?.version !== 2) {
+            reject(
+              new Error(
+                'No version 2 vault record holds the first-publish marker, so it was not set.',
+              ),
+            );
+
+            return;
+          }
+
+          store.put({
+            ...record,
+            firstKeychainPublish: state,
+            updatedAt: Date.now(),
+          } satisfies DeviceIdentityVaultRecord);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
   public async find(
     identityId: IdentityId,
   ): Promise<DeviceIdentityVaultRecord | undefined> {
@@ -127,7 +172,38 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
   }
 
   public async save(record: DeviceIdentityVaultRecord): Promise<void> {
-    await this.request('readwrite', (store) => store.put(record));
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(record.identityId);
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const existing = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          // A save without a marker keeps the stored one, so a registration
+          // cannot clear a pending first publish.
+          store.put({
+            ...record,
+            firstKeychainPublish:
+              record.firstKeychainPublish ?? existing?.firstKeychainPublish,
+          } satisfies DeviceIdentityVaultRecord);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
+  public async insert(record: DeviceIdentityVaultRecord): Promise<void> {
+    await this.request('readwrite', (store) => store.add(record));
   }
 
   public async replaceProtection(
@@ -158,7 +234,12 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
             return;
           }
 
-          store.put(next);
+          // A password change keeps the live marker, so a stale copy cannot
+          // revert a first publish state already recorded.
+          store.put({
+            ...next,
+            firstKeychainPublish: record.firstKeychainPublish,
+          } satisfies DeviceIdentityVaultRecord);
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));

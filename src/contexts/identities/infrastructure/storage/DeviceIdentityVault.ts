@@ -3,7 +3,10 @@ import { assert } from '@haskou/value-objects';
 
 import type { DeviceIdentityKeyMaterial } from '../crypto/DeviceIdentityKeyMaterial';
 import type { ProtectedDeviceIdentity } from '../crypto/ProtectedDeviceIdentity';
-import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
+import type {
+  DeviceIdentityVaultRecord,
+  FirstKeychainPublishState,
+} from './DeviceIdentityVaultRecord';
 import type { DeviceIdentityVaultSession } from './DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from './DeviceIdentityVaultStore';
 
@@ -165,9 +168,30 @@ export class DeviceIdentityVault {
     await this.store.delete(identityId);
   }
 
+  /**
+   * The first-publish state of an identity created on this device. Only an
+   * `armed` state lets its first keychain post without a head. An identity
+   * with no local record has none.
+   */
+  public async firstKeychainPublishState(
+    identityId: IdentityId,
+  ): Promise<FirstKeychainPublishState> {
+    const record = await this.store.find(identityId);
+
+    return record?.firstKeychainPublish ?? 'none';
+  }
+
+  public async setFirstKeychainPublish(
+    identityId: IdentityId,
+    state: FirstKeychainPublishState,
+  ): Promise<void> {
+    await this.store.setFirstKeychainPublish(identityId, state);
+  }
+
   public async register(input: {
     authorizationEpoch?: DeviceAuthorizationEpoch;
     authorizationRevision?: DeviceAuthorizationRevision;
+    firstKeychainPublish?: 'armed';
     identityId: IdentityId;
     material: DeviceIdentityKeyMaterial;
     password: string;
@@ -188,14 +212,24 @@ export class DeviceIdentityVault {
       input.authorizationRevision ?? DeviceAuthorizationRevision.initial();
     const createdAt = Date.now();
 
-    await this.store.save(
-      this.record(
+    const record: DeviceIdentityVaultRecord = {
+      ...this.record(
         protectedIdentity,
         authorizationEpoch,
         authorizationRevision,
         createdAt,
       ),
-    );
+      firstKeychainPublish: input.firstKeychainPublish,
+    };
+
+    // A first publish arms a new record only; an existing record is refused
+    // rather than re-armed. Other registrations overwrite the record and keep
+    // the marker it already holds.
+    if (input.firstKeychainPublish === 'armed') {
+      await this.store.insert(record);
+    } else {
+      await this.store.save(record);
+    }
 
     return {
       authorizationEpoch,

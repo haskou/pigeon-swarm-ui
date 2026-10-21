@@ -186,6 +186,7 @@ export class PigeonApiGateway {
       signer,
       keychainCipher,
       this.requestCache,
+      this.identityVault,
     );
     const deviceSealedRoot = new DeviceSealedRootRotation(
       deviceAuthorization,

@@ -1,7 +1,10 @@
 import type { DeviceAuthorizationEpoch } from '../../domain/value-objects/DeviceAuthorizationEpoch';
 import type { DeviceAuthorizationRevision } from '../../domain/value-objects/DeviceAuthorizationRevision';
 import type { IdentityId } from '../../domain/value-objects/IdentityId';
-import type { DeviceIdentityVaultRecord } from './DeviceIdentityVaultRecord';
+import type {
+  DeviceIdentityVaultRecord,
+  FirstKeychainPublishState,
+} from './DeviceIdentityVaultRecord';
 
 export interface DeviceIdentityVaultStore {
   advanceAuthorization(
@@ -16,7 +19,12 @@ export interface DeviceIdentityVaultStore {
     revision: DeviceAuthorizationRevision,
   ): Promise<void>;
   delete(identityId: IdentityId): Promise<void>;
+  setFirstKeychainPublish(
+    identityId: IdentityId,
+    state: FirstKeychainPublishState,
+  ): Promise<void>;
   find(identityId: IdentityId): Promise<DeviceIdentityVaultRecord | undefined>;
+  insert(record: DeviceIdentityVaultRecord): Promise<void>;
   save(record: DeviceIdentityVaultRecord): Promise<void>;
   replaceProtection(
     expected: DeviceIdentityVaultRecord,

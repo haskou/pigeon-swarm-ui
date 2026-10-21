@@ -9,11 +9,15 @@ import type {
   LocalKeychainUpdate,
 } from '../keychain/LocalKeychain';
 import type { Session } from '../session/Session';
+import type { DeviceIdentityVault } from '../storage/DeviceIdentityVault';
+import type { FirstKeychainPublishState } from '../storage/DeviceIdentityVaultRecord';
 import type { KeychainResource } from './resources/KeychainResource';
 
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
+import { IdentityId } from '../../domain/value-objects/IdentityId';
 import { KeychainHeadUnavailableError } from './errors/KeychainHeadUnavailableError';
+import { KeychainNotFoundError } from './errors/KeychainNotFoundError';
 
 const remoteKeychainCacheTtlMs = 1500;
 
@@ -29,6 +33,7 @@ export class PigeonKeychainApi {
     private readonly signer: RequestSigner,
     private readonly cipher: KeychainCipher,
     private readonly requestCache: RequestCache,
+    private readonly vault: DeviceIdentityVault,
   ) {}
 
   private async enqueuePublish<T>(
@@ -167,6 +172,64 @@ export class PigeonKeychainApi {
     });
   }
 
+  /**
+   * Posts an identity's first keychain without a head, the only pointer-less
+   * publish allowed, and only from `armed`. The marker moves to `ambiguous`
+   * before the POST, so a post that loses its answer is never repeated
+   * head-less. A definitive 4xx refusal commits nothing and returns the marker
+   * to `armed`. `ambiguous` never posts; it clears only when a head is adopted.
+   * `none` never posts.
+   */
+  private async publishFirstKeychain(
+    session: Session,
+    identityId: IdentityId,
+    state: FirstKeychainPublishState,
+    update: LocalKeychainUpdate,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
+    if (state === 'none') {
+      throw new KeychainNotFoundError();
+    }
+
+    if (state === 'ambiguous') {
+      throw new KeychainHeadUnavailableError('ambiguous');
+    }
+
+    const keychain = update(session.keychain);
+
+    // Written before the POST, so a failed write sends nothing.
+    await this.vault.setFirstKeychainPublish(identityId, 'ambiguous');
+
+    let published: {
+      keychain: LocalKeychain;
+      keychainExternalIdentifier: string;
+    };
+
+    try {
+      published = await this.postKeychain(session, undefined, keychain);
+    } catch (caught: unknown) {
+      // A definitive 4xx refusal commits nothing, so the first publish is
+      // armed again. Any other failure may have committed and stays ambiguous.
+      // The node returns 4xx from POST /keychains only before commit
+      // (pigeon-swarm-node origin/main 31fc9d20: PostKeychainRoute.ts:22-50,
+      // KeychainPublisher.ts:46-71, commit at line 71). Keep in step with it.
+      const refused =
+        caught instanceof HttpJsonError &&
+        caught.status >= 400 &&
+        caught.status < 500 &&
+        caught.status !== 408;
+
+      if (refused) {
+        await this.vault.setFirstKeychainPublish(identityId, 'armed');
+      }
+
+      throw caught;
+    }
+
+    await this.vault.setFirstKeychainPublish(identityId, 'none');
+
+    return published;
+  }
+
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
     return this.cipher.decrypt(session, keychain);
   }
@@ -190,25 +253,60 @@ export class PigeonKeychainApi {
     );
   }
 
+  /**
+   * Publishes the session's keychain. A publish with no pointer may post a
+   * head-less keychain only from the `armed` marker. An `ambiguous` marker is
+   * resolved only by adopting a head the node reports, so while no head is
+   * readable the publish is refused before any POST. A pointer whose head
+   * cannot be read is refused the same way, so a pointer never reaches the
+   * head-less path.
+   */
   public async publishKeychain(
     session: Session,
     update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     return await this.enqueuePublish(session.identity.id, async () => {
-      const head = await this.readPublishHead(session);
+      const identityId = IdentityId.fromString(session.identity.id);
+      const state = await this.vault.firstKeychainPublishState(identityId);
+      let head: KeychainHead | undefined;
+
+      try {
+        head = await this.readPublishHead(session);
+      } catch (caught: unknown) {
+        // An ambiguous first publish can only be resolved by adopting a head,
+        // so while the head is unreadable it is refused and stays ambiguous.
+        if (state === 'ambiguous') {
+          throw new KeychainHeadUnavailableError('ambiguous');
+        }
+
+        throw caught;
+      }
 
       // A pointer proves a keychain exists. A head still missing after the lag
       // window is not absence: a root posted without a previous link would sit
       // beside the existing keychain, so the publish is refused instead.
       if (!head && session.keychainExternalIdentifier) {
-        throw new KeychainHeadUnavailableError();
+        throw new KeychainHeadUnavailableError('unreplicated');
       }
 
-      return await this.postKeychain(
-        session,
-        head,
-        update(head?.keychain ?? session.keychain),
-      );
+      if (!head) {
+        return await this.publishFirstKeychain(
+          session,
+          identityId,
+          state,
+          update,
+        );
+      }
+
+      const keychain = update(head.keychain);
+
+      // A head proves the first keychain exists, so a pending or ambiguous
+      // first publish is over. Clearing it adopts this head.
+      if (state !== 'none') {
+        await this.vault.setFirstKeychainPublish(identityId, 'none');
+      }
+
+      return await this.postKeychain(session, head, keychain);
     });
   }
 
