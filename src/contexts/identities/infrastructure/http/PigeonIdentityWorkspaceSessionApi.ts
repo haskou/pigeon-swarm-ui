@@ -36,7 +36,7 @@ export class PigeonIdentityWorkspaceSessionApi {
     // A pointer means a keychain exists. Reading none is a failed read, not
     // absence, so sign-in fails instead of continuing with an empty shell.
     if (!keychainResource && session.keychainExternalIdentifier) {
-      throw new KeychainHeadUnavailableError();
+      throw new KeychainHeadUnavailableError('unreplicated');
     }
 
     const keychain = keychainResource
