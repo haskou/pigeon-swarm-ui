@@ -8,6 +8,7 @@ import {
   loginIdentity,
   newIsolatedPage,
   openSidebar,
+  pairNewDevice,
   registerIdentity,
 } from './support/pigeonApp';
 
@@ -44,11 +45,13 @@ test('a device whose communities were all left on another device continues witho
       name: `Owner ${suffix}`,
       password,
     });
-    const recoveryKey = await registerIdentity(laptop, {
+    const member = {
       handle: memberHandle,
       name: `Member ${suffix}`,
       password,
-    });
+    };
+
+    await registerIdentity(laptop, member);
 
     await openSidebar(owner);
     await owner
@@ -74,8 +77,9 @@ test('a device whose communities were all left on another device continues witho
       .first()
       .waitFor({ timeout: SLOW });
 
-    // The phone, the same identity on another device, leaves the community.
-    await loginIdentity(phone, `@${memberHandle}`, password, recoveryKey);
+    // The phone, the same identity paired as another device, leaves the
+    // community. A recovery-key sign-in would remove the laptop instead.
+    await pairNewDevice(laptop, phone, member);
     const phoneCommunity = phone
       .getByRole('button', { name: communityName })
       .first();
