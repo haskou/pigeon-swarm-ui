@@ -15,6 +15,7 @@ import {
   loadLastLoginIdentity,
 } from '../../../contexts/identities/infrastructure/storage/lastLoginIdentity';
 import { clearProjectedMessageCaches } from '../../../shared/infrastructure/storage/clearProjectedMessageCaches';
+import { scopeClientStorageKey } from '../../../shared/infrastructure/storage/ClientStorageScope';
 
 jest.mock('../../../shared/infrastructure/storage/clearProjectedMessageCaches');
 jest.mock(
@@ -71,6 +72,9 @@ describe('eraseRemovedDevice', () => {
     ]) {
       expect(storage.removeItem).toHaveBeenCalledWith(key);
     }
+    expect(storage.removeItem).toHaveBeenCalledWith(
+      scopeClientStorageKey('pigeon:communitiesSeen:identity-1'),
+    );
     expect(removed.identities.forgetDeviceUnlock).toHaveBeenCalledWith(
       'identity-1',
     );

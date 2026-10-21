@@ -3,16 +3,23 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
-import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 import type { Session } from '../../../identities/infrastructure/session/Session';
+import type { CommunityResource as Community } from '../../infrastructure/http/resources/CommunityResource';
 
 import { loadApplicationContainer } from '../../../../app/composition/loadApplicationContainer';
 import { copy } from '../../../../shared/presentation/i18n/copy';
 import { toUserErrorMessage } from '../../../../shared/presentation/toUserErrorMessage';
+import {
+  forgetCommunitiesSeen,
+  rememberCommunitiesSeen,
+} from '../../infrastructure/storage/communitiesSeen';
 import { CommunityList } from '../view-models/CommunityList';
+import { CommunityListLoads } from './CommunityListLoads';
+import { loadCommunityList } from './loadCommunityList';
 
 type CommunitiesState = {
   communities: Community[];
@@ -37,6 +44,10 @@ export function useCommunities(session?: null | Session): CommunitiesState {
   const [loadedIdentityId, setLoadedIdentityId] = useState<string | null>(null);
 
   const sessionIdentityId = session?.identity.id ?? null;
+  const loads = useRef(new CommunityListLoads());
+  const currentIdentityId = useRef<string | null>(null);
+
+  currentIdentityId.current = sessionIdentityId;
   const rememberCommunities = useCallback(
     (next: SetStateAction<Community[]>) => {
       setCommunities((current) => {
@@ -47,6 +58,18 @@ export function useCommunities(session?: null | Session): CommunitiesState {
         const uniqueCommunities = CommunityList.withUniqueIds(resolved);
 
         if (sessionIdentityId) {
+          // A change that lands after the session ended must not recreate the
+          // flag the device erase just removed.
+          if (currentIdentityId.current !== sessionIdentityId) {
+            return uniqueCommunities;
+          }
+
+          if (uniqueCommunities.length > 0) {
+            rememberCommunitiesSeen(sessionIdentityId);
+          } else {
+            forgetCommunitiesSeen(sessionIdentityId);
+          }
+
           communityCacheByIdentityId.set(sessionIdentityId, {
             communities: uniqueCommunities,
             storedAt: Date.now(),
@@ -61,6 +84,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
 
   const reload = useCallback(async () => {
     if (!session) {
+      loads.current.cancel();
       setCommunities([]);
       setLoadedIdentityId(null);
       setLoading(false);
@@ -69,6 +93,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     }
 
     const identityId = session.identity.id;
+    const load = loads.current.begin(identityId);
     const cached = cachedCommunitiesFor(identityId);
 
     if (cached) {
@@ -81,30 +106,55 @@ export function useCommunities(session?: null | Session): CommunitiesState {
 
     setError(null);
 
-    try {
-      const applicationContainer = await loadApplicationContainer();
-      const nextCommunities =
-        await applicationContainer.communities.list(session);
+    let applicationContainer: Awaited<
+      ReturnType<typeof loadApplicationContainer>
+    >;
 
-      rememberCommunities((current) =>
-        CommunityList.preservingVoicePresence(nextCommunities, current),
-      );
-      setLoadedIdentityId(identityId);
+    try {
+      applicationContainer = await loadApplicationContainer();
     } catch (caught) {
-      if (!cached) {
-        setError(
-          new Error(toUserErrorMessage(caught, copy.communities.loadError)),
-        );
+      if (load.isCurrent()) {
+        if (!cached) {
+          setError(
+            new Error(toUserErrorMessage(caught, copy.communities.loadError)),
+          );
+        }
+        setLoadedIdentityId(identityId);
+        setLoading(false);
       }
 
-      setLoadedIdentityId(identityId);
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    await loadCommunityList({
+      load,
+      onFailed: (caught) => {
+        if (!cached) {
+          setError(
+            new Error(toUserErrorMessage(caught, copy.communities.loadError)),
+          );
+        }
+
+        setLoadedIdentityId(identityId);
+        setLoading(false);
+      },
+      onSettled: (nextCommunities) => {
+        rememberCommunities((current) =>
+          CommunityList.preservingVoicePresence(nextCommunities, current),
+        );
+        setLoadedIdentityId(identityId);
+        setLoading(false);
+      },
+      read: async () => await applicationContainer.communities.list(session),
+    });
   }, [rememberCommunities, session]);
 
   useEffect(() => {
     void reload();
+
+    return () => {
+      loads.current.cancel();
+    };
   }, [reload]);
 
   return {

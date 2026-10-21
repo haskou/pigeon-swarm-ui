@@ -100,6 +100,13 @@ Offline when the last update expires, within its 90-second lifetime plus the
 30-second read interval, and never shows Invisible) runs on
 `desktop-chromium`. The harness runs one node, so the spec does not cover
 contacts whose mailboxes live on different nodes.
+`community-list-after-restart.spec.ts` (a new user's empty community list is
+read once, with no retry loop; a creator whose node is restarted and first
+answers an empty list, or 503020, sees the community and never the "No
+communities yet" notice) runs on `desktop-chromium`. The script passes the
+node container as `E2E_NODE_CONTAINER`, which the spec restarts; the first
+answers after the restart are served by a route, since a node with one small
+community opens its state within seconds.
 The `real-node-e2e` job in
 `.github/workflows/ci.yml` builds the node image from the pins below and runs
 these specs. It is the check that catches UI and node

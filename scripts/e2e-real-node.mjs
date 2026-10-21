@@ -41,6 +41,7 @@ const runs = [
       'e2e/history-backup.spec.ts',
       'e2e/recovery-key-keychain.spec.ts',
       'e2e/contact-presence.spec.ts',
+      'e2e/community-list-after-restart.spec.ts',
       'e2e/empty-members-column.spec.ts',
     ],
     projects: ['desktop-chromium'],
@@ -154,6 +155,7 @@ const main = async () => {
           ...process.env,
           E2E_BASE_URL: origin,
           E2E_NETWORK_ID: network.id,
+          E2E_NODE_CONTAINER: container,
         },
       );
       code ||= runCode;

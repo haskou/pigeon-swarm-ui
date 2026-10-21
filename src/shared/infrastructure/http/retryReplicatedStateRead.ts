@@ -13,7 +13,7 @@ type RetryReplicatedStateReadOptions<T> = {
   signal?: AbortSignal;
 };
 
-function isReplicatedStateNotReady(caught: unknown): boolean {
+export function isReplicatedStateNotReady(caught: unknown): boolean {
   return (
     caught instanceof HttpJsonError &&
     String(caught.code) === replicatedStateNotReadyCode

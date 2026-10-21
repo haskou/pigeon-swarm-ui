@@ -1,3 +1,4 @@
+import { forgetCommunitiesSeen } from '../../contexts/communities/infrastructure/storage/communitiesSeen';
 import {
   clearLastLoginIdentity,
   loadLastLoginIdentity,
@@ -67,6 +68,8 @@ export async function eraseRemovedDevice(
       ]) {
         globalThis.localStorage?.removeItem(key);
       }
+
+      forgetCommunitiesSeen(identityId);
     },
   ];
   let erased = true;
