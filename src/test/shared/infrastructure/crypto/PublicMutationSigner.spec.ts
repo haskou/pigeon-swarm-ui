@@ -120,4 +120,28 @@ describe(PublicMutationSigner.name, () => {
     expect(first.author.authorizationRevision).toBe(4);
     expect(second.author.authorizationRevision).toBe(5);
   });
+
+  it('signs at the observed revision without asking for a fresh one', async () => {
+    const device = await KeyPair.generate();
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const current = jest.fn();
+    const observed = jest.fn().mockReturnValue(6);
+    const signer = new PublicMutationSigner({ current, observed });
+
+    const mutation = signer.signAtObservedRevision(
+      session,
+      { kind: 'put', payload: { a: 1 }, recordId: 'record-1', store: 'pins' },
+      PublicMutationSigner.FIRST_POSITION,
+    );
+
+    expect(current).not.toHaveBeenCalled();
+    expect(observed).toHaveBeenCalledWith(session);
+    expect(mutation.author.authorizationRevision).toBe(6);
+    expect(() =>
+      PublicMutationSignature.verify(mutation, publicKeyOf(device)),
+    ).not.toThrow();
+  });
 });

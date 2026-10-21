@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Browser, type Page, test } from '@playwright/test';
 
 import {
   acceptLatestInvitation,
@@ -7,6 +7,12 @@ import {
   registerIdentity,
   type TestIdentity,
 } from './support/pigeonApp';
+
+/**
+ * Longer than any read the client caches for signing, so the departure cannot
+ * reuse a value a recent request happened to leave behind.
+ */
+const RINGING_DWELL_MS = 6_000;
 
 test('declines a ringing call when the callee leaves the page', async ({
   browser,
@@ -17,6 +23,32 @@ test('declines a ringing call when the callee leaves the page', async ({
   );
   test.slow();
 
+  const { calleePage, callerPage } = await ringCallee(browser);
+
+  await leaveAndExpectDecline(calleePage, callerPage);
+});
+
+test('declines a ringing call when the callee leaves after it rang a while', async ({
+  browser,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop-chromium',
+    'The call is started from the desktop conversation menu.',
+  );
+  test.slow();
+
+  const { calleePage, callerPage } = await ringCallee(browser);
+
+  // A person looks at the ringing call before closing the tab; no request of
+  // the callee page is in flight or freshly cached when it leaves.
+  await calleePage.waitForTimeout(RINGING_DWELL_MS);
+
+  await leaveAndExpectDecline(calleePage, callerPage);
+});
+
+async function ringCallee(
+  browser: Browser,
+): Promise<{ calleePage: Page; callerPage: Page }> {
   const token = testRunToken();
   const password = `P455uruD3su!${token}`;
   const caller: TestIdentity = {
@@ -46,10 +78,18 @@ test('declines a ringing call when the callee leaves the page', async ({
     timeout: 60_000,
   });
 
+  return { calleePage, callerPage };
+}
+
+async function leaveAndExpectDecline(
+  calleePage: Page,
+  callerPage: Page,
+): Promise<void> {
   const declineRequest = calleePage.waitForRequest(
     (request) =>
       request.method() === 'DELETE' &&
       /\/calls\/[^/]+\/participants\/me$/.test(new URL(request.url()).pathname),
+    { timeout: 30_000 },
   );
 
   await calleePage.goto('about:blank');
@@ -62,7 +102,7 @@ test('declines a ringing call when the callee leaves the page', async ({
   await expect(callerPage.getByText('Call declined').first()).toBeVisible({
     timeout: 60_000,
   });
-});
+}
 
 function testRunToken(): string {
   const timestamp = Date.now().toString(36).slice(-6);

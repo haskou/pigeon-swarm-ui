@@ -85,4 +85,46 @@ describe(DeviceAuthorizationRevisionSource.name, () => {
 
     await expect(source.current(sessionAt(6))).resolves.toBe(6);
   });
+
+  describe('observed', () => {
+    it('answers the enrolment revision before any read, without reading', () => {
+      const { find, source } = build();
+
+      expect(source.observed(sessionAt(3))).toBe(3);
+      expect(find).not.toHaveBeenCalled();
+    });
+
+    it('keeps answering the last revision read after the window expires', async () => {
+      const { find, now, source } = build(5000);
+      const session = sessionAt(0);
+
+      find.mockResolvedValueOnce(checkpoint(7));
+      await source.current(session);
+      now.value += 60_000;
+
+      expect(source.observed(session)).toBe(7);
+      expect(find).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a read still in flight and a failed read', async () => {
+      const { find, source } = build();
+      const session = sessionAt(2);
+
+      find.mockRejectedValueOnce(new Error('offline'));
+      await expect(source.current(session)).rejects.toThrow('offline');
+      find.mockReturnValueOnce(new Promise(() => undefined));
+      void source.current(session);
+
+      expect(source.observed(session)).toBe(2);
+    });
+
+    it('never answers below the revision at which this device was enrolled', async () => {
+      const { find, source } = build();
+
+      find.mockResolvedValueOnce(checkpoint(2));
+      await source.current(sessionAt(6));
+
+      expect(source.observed(sessionAt(6))).toBe(6);
+    });
+  });
 });

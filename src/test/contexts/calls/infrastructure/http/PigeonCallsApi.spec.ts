@@ -1,9 +1,12 @@
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
 import { CallEventSigner } from '../../../../../contexts/calls/infrastructure/http/CallEventSigner';
 import { PigeonCallsApi } from '../../../../../contexts/calls/infrastructure/http/PigeonCallsApi';
+import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -184,6 +187,76 @@ describe(PigeonCallsApi.name, () => {
     expect(participant.mock.calls[1]?.[4]).toEqual({
       predecessor: 'digest-a',
       sequence: 4,
+    });
+  });
+
+  describe('on page departure', () => {
+    /**
+     * A page that is being torn down cancels every ordinary request it still
+     * has in flight; only a keepalive request dispatched before the teardown
+     * reaches the node. The departure must therefore not wait for a revision
+     * read, which here never answers.
+     */
+    async function departing() {
+      const device = await KeyPair.generate();
+      const departingSession = {
+        deviceCredentialKeyPair: device,
+        identity: { id: 'identity-a' },
+      } as unknown as Session;
+      const request = jest.fn().mockResolvedValue(undefined);
+      const current = jest.fn(() => new Promise<number>(() => undefined));
+      const signer = {
+        headers: jest.fn().mockResolvedValue({}),
+      } as unknown as RequestSigner;
+      const api = new PigeonCallsApi(
+        { request } as unknown as HttpJsonClient,
+        signer,
+        new CallEventSigner(
+          new PublicMutationSigner({ current, observed: () => 4 }),
+        ),
+        { communityNetworkId: jest.fn(), conversation: jest.fn() },
+      );
+
+      return { api, current, departingSession, request };
+    }
+
+    it.each([true, false])(
+      'dispatches a keepalive leave with declined=%s without a revision read',
+      async (declined) => {
+        const { api, current, departingSession, request } = await departing();
+
+        void api.leaveOnPageDeparture(departingSession, 'call-a', 6, declined);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(current).not.toHaveBeenCalled();
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.mock.calls[0]).toEqual([
+          '/calls/call-a/participants/me',
+          expect.objectContaining({ keepalive: true, method: 'DELETE' }),
+        ]);
+        expect(bodyOf(request, 0)).toMatchObject({
+          at: 6,
+          mutation: { author: { authorizationRevision: 4 } },
+        });
+      },
+    );
+
+    it('dispatches a keepalive end without a revision read', async () => {
+      const { api, current, departingSession, request } = await departing();
+
+      void api.endOnPageDeparture(departingSession, 'call-a', 8);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(current).not.toHaveBeenCalled();
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request.mock.calls[0]).toEqual([
+        '/calls/call-a',
+        expect.objectContaining({ keepalive: true, method: 'DELETE' }),
+      ]);
+      expect(bodyOf(request, 0)).toMatchObject({
+        at: 8,
+        mutation: { author: { authorizationRevision: 4 } },
+      });
     });
   });
 
