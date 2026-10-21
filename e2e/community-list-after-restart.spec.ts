@@ -75,6 +75,12 @@ test.describe('community list', () => {
       name: 'a replicated state not ready',
       reads: 10,
     },
+    {
+      // What a proxy in front of the node answers while the node restarts.
+      answer: { body: '', status: 502 },
+      name: 'a bad gateway',
+      reads: 3,
+    },
   ]) {
     test(`the creator sees the community again after the node restarts and first answers ${scenario.name}`, async ({
       browser,

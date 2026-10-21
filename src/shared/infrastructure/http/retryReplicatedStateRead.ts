@@ -41,7 +41,7 @@ export function isReplicatedStateNotReady(caught: unknown): boolean {
 /**
  * True for a failure of a node that is still starting: the request never
  * reached it (an `HttpConnectionError`, such as a refused connection), or the
- * proxy in front of it answers 502 or 503 without a Pigeon code. A coded
+ * proxy in front of it answers 502, 503 or 504 without a Pigeon code. A coded
  * answer comes from the node itself and says what it means, so it is never
  * read as a node that is starting.
  */
@@ -53,7 +53,7 @@ export function isNodeStarting(caught: unknown): boolean {
   return (
     caught instanceof HttpJsonError &&
     caught.code === undefined &&
-    (caught.status === 502 || caught.status === 503)
+    (caught.status === 502 || caught.status === 503 || caught.status === 504)
   );
 }
 
