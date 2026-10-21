@@ -28,6 +28,7 @@ import { DeviceHistoryFloor } from '../../../../../contexts/identities/domain/va
 import { DevicePairingHistoryPolicy } from '../../../../../contexts/identities/domain/value-objects/DevicePairingHistoryPolicy';
 import { PigeonIdentitiesGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentitiesGateway';
 import { DeviceUnlockNotConfirmedError } from '../../../../../contexts/identities/infrastructure/storage/DeviceUnlockNotConfirmedError';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 function identity(): IdentityResource {
@@ -45,6 +46,12 @@ function identity(): IdentityResource {
     version: 1,
   };
 }
+
+const replicatedStateNotReady = new HttpJsonError(
+  503,
+  'Service Unavailable',
+  JSON.stringify({ code: 503020 }),
+);
 
 function gatewayDouble(): {
   authorization: jest.Mocked<
@@ -176,6 +183,10 @@ function gatewayDouble(): {
 }
 
 describe(PigeonIdentitiesGateway.name, () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('adapts identity profile reads to the application boundary', async () => {
     const { gateway, profile } = gatewayDouble();
     const result = identity();
@@ -242,6 +253,40 @@ describe(PigeonIdentitiesGateway.name, () => {
       ).rejects.toThrow('Recovery kit does not belong to this identity.');
       expect(sealedRoot.openAfterRecovery).not.toHaveBeenCalled();
       expect(login.hydrate).not.toHaveBeenCalled();
+    });
+
+    it('waits out a node whose replicated state is still opening before recovering', async () => {
+      const { authorization, gateway, login, profile, sealedRoot } =
+        gatewayDouble();
+      const recovered = {
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const rooted = {
+        ...recovered,
+        deviceSealedRootKey: SymmetricKey.generate(),
+      } as Session;
+      const hydrateResult = { session: rooted } as unknown as LoginResult;
+      profile.get
+        .mockRejectedValueOnce(replicatedStateNotReady)
+        .mockRejectedValueOnce(replicatedStateNotReady)
+        .mockResolvedValueOnce(identity());
+      authorization.recover.mockResolvedValue(recovered);
+      sealedRoot.openAfterRecovery.mockResolvedValue(rooted);
+      login.hydrate.mockResolvedValue(hydrateResult);
+
+      jest.useFakeTimers();
+      const onProgress = jest.fn();
+      const pending = gateway.recover(
+        'identity-1',
+        'password',
+        recoveryKey,
+        onProgress,
+      );
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toBe(hydrateResult);
+      expect(profile.get).toHaveBeenCalledTimes(3);
+      expect(onProgress).toHaveBeenCalledWith('node-starting');
     });
 
     it('refuses the recovery without hydrating when no fresh root opens', async () => {
@@ -592,6 +637,41 @@ describe(PigeonIdentitiesGateway.name, () => {
       expect(login.hydrate).toHaveBeenCalledWith(rooted, undefined);
       expect(pairingHistory.receive).toHaveBeenCalledWith(hydrated, secret);
       expect(result.session).toBe(hydrated);
+    });
+
+    it('waits out a node whose replicated state is still opening before completing the pairing', async () => {
+      const { authorization, gateway, login, profile, sealedRoot } =
+        gatewayDouble();
+      const pendingSession = {
+        identity: { id: 'identity-1' },
+      } as unknown as Session;
+      const rooted = {
+        ...pendingSession,
+        deviceSealedRootKey: SymmetricKey.generate(),
+      } as unknown as Session;
+      const hydrated = { ...rooted, hydrated: true } as unknown as Session;
+      profile.get
+        .mockRejectedValueOnce(replicatedStateNotReady)
+        .mockRejectedValueOnce(replicatedStateNotReady)
+        .mockResolvedValueOnce(identity());
+      authorization.completePairing.mockResolvedValue({
+        historyTransferSecret: SymmetricKey.generate(),
+        session: pendingSession,
+      });
+      sealedRoot.current.mockResolvedValue(rooted);
+      login.hydrate.mockResolvedValue({ conversations: [], session: hydrated });
+
+      jest.useFakeTimers();
+      const completion = gateway.completeDevicePairing(
+        'identity-1',
+        password,
+        draft,
+        completionCode,
+      );
+      await jest.runAllTimersAsync();
+
+      await expect(completion).resolves.toMatchObject({ session: hydrated });
+      expect(profile.get).toHaveBeenCalledTimes(3);
     });
 
     it('refuses the pairing without hydrating when the sealed root cannot be opened', async () => {

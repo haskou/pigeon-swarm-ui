@@ -413,7 +413,7 @@ describe(PigeonKeychainApi.name, () => {
       await jest.runAllTimersAsync();
 
       await expect(pending).resolves.toBeUndefined();
-      expect(request).toHaveBeenCalledTimes(7);
+      expect(request).toHaveBeenCalledTimes(9);
     });
 
     it('retries a 503020 read when the session holds no keychain pointer', async () => {
@@ -453,6 +453,42 @@ describe(PigeonKeychainApi.name, () => {
 
       await expect(pending).resolves.toBe(keychainResource);
       expect(request).toHaveBeenCalledTimes(3);
+    });
+
+    it('reports each wait on a 503020 read to the caller', async () => {
+      const onNotReady = jest.fn();
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new HttpJsonError(
+            503,
+            'Service Unavailable',
+            JSON.stringify({ code: 503020 }),
+          ),
+        )
+        .mockResolvedValueOnce(keychainResource);
+      const pending = apiFor(request).loadOptional(session, { onNotReady });
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toBe(keychainResource);
+      expect(onNotReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports each wait on a pointer-present 409 miss to the caller', async () => {
+      const onNotReady = jest.fn();
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(lagError())
+        .mockResolvedValueOnce(keychainResource);
+      const pending = apiFor(request).loadOptional(pointedSession, {
+        onNotReady,
+      });
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toBe(keychainResource);
+      expect(onNotReady).toHaveBeenCalledTimes(1);
     });
 
     it('reads once when the session holds no keychain pointer so login and registration are not delayed', async () => {

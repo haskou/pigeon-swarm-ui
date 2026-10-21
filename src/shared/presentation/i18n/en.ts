@@ -103,6 +103,9 @@ export const en = {
       decryptingKeys: 'Decrypting keys...',
       loadingKeychain: 'Loading keychain...',
       loadingWorkspace: 'Opening workspace...',
+      nodeStarting: 'Node is starting...',
+      nodeStartingHelp:
+        'The node is still opening its state. Sign-in continues once it is ready.',
       resolvingIdentity: 'Downloading identity...',
     },
     loginSubmit: 'Decrypt and enter',

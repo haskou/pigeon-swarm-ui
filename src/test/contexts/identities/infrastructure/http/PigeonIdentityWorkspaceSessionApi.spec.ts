@@ -5,6 +5,7 @@ import type { KeychainResource } from '../../../../../contexts/identities/infras
 import type { LocalKeychain } from '../../../../../contexts/identities/infrastructure/keychain/LocalKeychain';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 
+import { KeychainHeadUnavailableError } from '../../../../../contexts/identities/infrastructure/http/errors/KeychainHeadUnavailableError';
 import { PigeonIdentityWorkspaceSessionApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityWorkspaceSessionApi';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
@@ -30,6 +31,12 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       listConversations: jest.fn().mockResolvedValue(conversations),
       loadKeychain: jest.fn().mockResolvedValue(keychainResource),
     };
+  }
+
+  function resolveAfter<T>(value: T, ms: number): Promise<T> {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(value), ms);
+    });
   }
 
   it('hydrates keychain and conversations while reporting workspace progress', async () => {
@@ -179,10 +186,10 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       const api = new PigeonIdentityWorkspaceSessionApi(workspace);
 
       const pending = api.hydrate(session).catch((caught: unknown) => caught);
-      await jest.advanceTimersByTimeAsync(10_000);
+      await jest.advanceTimersByTimeAsync(16_000);
 
       await expect(pending).resolves.toBe(notReady);
-      expect(workspace.listConversations).toHaveBeenCalledTimes(7);
+      expect(workspace.listConversations).toHaveBeenCalledTimes(9);
     });
 
     it('rejects a refresh once retries are exhausted', async () => {
@@ -191,9 +198,46 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
       const api = new PigeonIdentityWorkspaceSessionApi(workspace);
 
       const pending = api.refresh(session).catch((caught: unknown) => caught);
-      await jest.advanceTimersByTimeAsync(10_000);
+      await jest.advanceTimersByTimeAsync(16_000);
 
       await expect(pending).resolves.toBe(notReady);
+    });
+
+    it('reports that the node is starting while sign-in waits on the conversation list', async () => {
+      const workspace = port();
+      workspace.listConversations
+        .mockRejectedValueOnce(notReady)
+        .mockResolvedValue(conversations);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+      const onProgress = jest.fn();
+
+      const pending = api.hydrate(session, onProgress);
+      await jest.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toMatchObject({ conversations });
+      expect(onProgress).toHaveBeenCalledWith('node-starting');
+    });
+
+    it('keeps the node-starting notice up until the conversation list finishes retrying', async () => {
+      const workspace = port();
+      workspace.loadKeychain.mockImplementation(() =>
+        resolveAfter(keychainResource, 500),
+      );
+      workspace.listConversations
+        .mockRejectedValueOnce(notReady)
+        .mockRejectedValueOnce(notReady)
+        .mockResolvedValue(conversations);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+      const onProgress = jest.fn();
+
+      const pending = api.hydrate(session, onProgress);
+      // The keychain lands at 500ms; the list still waits for its third try.
+      await jest.advanceTimersByTimeAsync(600);
+
+      expect(onProgress).toHaveBeenLastCalledWith('node-starting');
+
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(pending).resolves.toMatchObject({ conversations });
     });
 
     it('does not retry failures other than 503020', async () => {
@@ -208,6 +252,33 @@ describe(PigeonIdentityWorkspaceSessionApi.name, () => {
 
       await expect(api.hydrate(session)).rejects.toBe(failure);
       expect(workspace.listConversations).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects sign-in without a session when the keychain read stays 503020', async () => {
+      const workspace = port();
+      workspace.loadKeychain.mockRejectedValue(notReady);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      await expect(api.hydrate(session)).rejects.toBe(notReady);
+      expect(workspace.decryptKeychain).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when the session holds a keychain pointer', () => {
+    const pointed = {
+      ...session,
+      keychainExternalIdentifier: 'keychain-cid',
+    } as Session;
+
+    it('fails sign-in instead of an empty keychain when the pointed keychain stays unread', async () => {
+      const workspace = port();
+      workspace.loadKeychain.mockResolvedValue(undefined);
+      const api = new PigeonIdentityWorkspaceSessionApi(workspace);
+
+      await expect(api.hydrate(pointed)).rejects.toBeInstanceOf(
+        KeychainHeadUnavailableError,
+      );
+      expect(workspace.decryptKeychain).not.toHaveBeenCalled();
     });
   });
 });

@@ -3,20 +3,35 @@ import { waitBeforeRetry } from './waitBeforeRetry';
 
 // The node answers 503020 while its replicated state is still opening after a
 // restart. That clears within seconds, so every read that can meet it shares
-// this schedule (about 10s in total) before the error is reported.
-const replicatedStateNotReadyCode = '503020';
-const replicatedStateRetryDelaysMs = [250, 500, 1000, 2000, 3000, 3000];
+// one schedule, which totals 15.75s before the error is reported. Two things
+// are retried on it: a 503020 failure, and a resolved value the caller marks
+// as pending with isPending. The keychain reads use isPending for a 409 miss
+// when the session holds a keychain pointer.
+export const replicatedStateNotReadyCodes: ReadonlySet<string> = new Set([
+  '503020',
+]);
+export const replicatedStateRetryDelaysMs: readonly number[] = [
+  250, 500, 1000, 2000, 3000, 3000, 3000, 3000,
+];
 
-type RetryReplicatedStateReadOptions<T> = {
+export type ReplicatedStateReadOptions = {
+  /**
+   * Called before each wait, on a 503020 answer or a pending value, so the
+   * caller can show it.
+   */
+  onNotReady?: () => void;
+  signal?: AbortSignal;
+};
+
+type RetryReplicatedStateReadOptions<T> = ReplicatedStateReadOptions & {
   /** Marks a resolved value that is still pending and worth another read. */
   isPending?: (value: T) => boolean;
-  signal?: AbortSignal;
 };
 
 export function isReplicatedStateNotReady(caught: unknown): boolean {
   return (
     caught instanceof HttpJsonError &&
-    String(caught.code) === replicatedStateNotReadyCode
+    replicatedStateNotReadyCodes.has(String(caught.code))
   );
 }
 
@@ -44,6 +59,7 @@ export async function retryReplicatedStateRead<T>(
         throw caught;
       }
 
+      options.onNotReady?.();
       await waitBeforeRetry(retryDelayMs, options.signal);
       continue;
     }
@@ -52,6 +68,7 @@ export async function retryReplicatedStateRead<T>(
       return value;
     }
 
+    options.onNotReady?.();
     await waitBeforeRetry(retryDelayMs, options.signal);
   }
 }

@@ -3,6 +3,7 @@ import type { SymmetricKey } from '@haskou/pigeon-swarm-crypto';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestCache } from '../../../../shared/infrastructure/http/RequestCache';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
+import type { ReplicatedStateReadOptions } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
 import type {
   LocalKeychain,
@@ -99,7 +100,7 @@ export class PigeonKeychainApi {
   private async readWithReplicationLag<T>(
     read: () => Promise<T>,
     session: Session,
-    signal?: AbortSignal,
+    options: ReplicatedStateReadOptions = {},
   ): Promise<T | undefined> {
     // Only a session that already holds a keychain pointer knows a keychain
     // exists, so only it reads a missing keychain as lag. Sessions without a
@@ -108,7 +109,11 @@ export class PigeonKeychainApi {
 
     return await retryReplicatedStateRead(
       async () => await this.undefinedWhenMissing(read),
-      { isPending: (value) => expected && value === undefined, signal },
+      {
+        isPending: (value) => expected && value === undefined,
+        onNotReady: options.onNotReady,
+        signal: options.signal,
+      },
     );
   }
 
@@ -244,12 +249,12 @@ export class PigeonKeychainApi {
 
   public async loadOptional(
     session: Session,
-    options: { signal?: AbortSignal } = {},
+    options: ReplicatedStateReadOptions = {},
   ): Promise<KeychainResource | undefined> {
     return await this.readWithReplicationLag(
       async () => await this.load(session),
       session,
-      options.signal,
+      options,
     );
   }
 

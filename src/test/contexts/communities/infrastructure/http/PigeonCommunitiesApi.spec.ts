@@ -167,6 +167,38 @@ describe(PigeonCommunitiesApi.name, () => {
       expect(headers).toHaveBeenCalledTimes(2);
     });
 
+    it('yields the community list once the node finishes opening within the budget', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(notReadyError())
+        .mockRejectedValueOnce(notReadyError())
+        .mockRejectedValueOnce(notReadyError())
+        .mockResolvedValueOnce({ communities: [{ id: 'community-1' }] });
+      const headers = jest
+        .fn()
+        .mockResolvedValue({ 'X-Identity-Id': 'identity-1' });
+      const pending = apiFor(request, headers).list(session);
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toEqual([{ id: 'community-1' }]);
+      expect(request).toHaveBeenCalledTimes(4);
+    });
+
+    it('surfaces the 503020 of a community list that never clears after exactly the budget attempts', async () => {
+      const request = jest.fn().mockRejectedValue(notReadyError());
+      const headers = jest
+        .fn()
+        .mockResolvedValue({ 'X-Identity-Id': 'identity-1' });
+      const pending = apiFor(request, headers).list(session);
+      const settled = expect(pending).rejects.toMatchObject({ code: 503020 });
+
+      await jest.runAllTimersAsync();
+
+      await settled;
+      expect(request).toHaveBeenCalledTimes(9);
+    });
+
     it('retries a channel message read the node is still opening', async () => {
       const request = jest
         .fn()

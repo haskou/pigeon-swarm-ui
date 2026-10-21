@@ -9,6 +9,7 @@ import type { LoginResult } from './resources/LoginResult';
 import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import { IdentitySnapshotSelection } from '../../domain/IdentitySnapshotSelection';
 import { KeychainVersion } from '../../domain/value-objects/KeychainVersion';
+import { KeychainHeadUnavailableError } from './errors/KeychainHeadUnavailableError';
 
 const emptyKeychain: LocalKeychain = {
   conversations: {},
@@ -20,9 +21,11 @@ export class PigeonIdentityWorkspaceSessionApi {
 
   private async listConversations(
     session: Session,
+    onProgress?: LoginIdentityProgressReporter,
   ): Promise<ConversationResource[]> {
     return await retryReplicatedStateRead(
       async () => await this.workspace.listConversations(session),
+      { onNotReady: () => onProgress?.('node-starting') },
     );
   }
 
@@ -30,6 +33,12 @@ export class PigeonIdentityWorkspaceSessionApi {
     session: Session,
     keychainResource: KeychainResource | undefined,
   ): Session {
+    // A pointer means a keychain exists. Reading none is a failed read, not
+    // absence, so sign-in fails instead of continuing with an empty shell.
+    if (!keychainResource && session.keychainExternalIdentifier) {
+      throw new KeychainHeadUnavailableError('unreplicated');
+    }
+
     const keychain = keychainResource
       ? this.workspace.decryptKeychain(session, keychainResource)
       : emptyKeychain;
@@ -76,14 +85,24 @@ export class PigeonIdentityWorkspaceSessionApi {
     onProgress?: LoginIdentityProgressReporter,
   ): Promise<LoginResult> {
     onProgress?.('loading-keychain');
-    const conversationsPromise = this.listConversations(session);
+    // Once the list has waited on the node, its notice must stay up until the
+    // last attempt, so the workspace step is not announced after that point.
+    let conversationsWaiting = false;
+    const conversationsPromise = this.listConversations(session, (step) => {
+      conversationsWaiting = true;
+      onProgress?.(step);
+    });
     // Handle a failed list now so it cannot go unhandled while the keychain
     // loads; the await below still rethrows it.
     void conversationsPromise.catch(() => undefined);
-    const keychainResource = await this.workspace.loadKeychain(session);
+    const keychainResource = await this.workspace.loadKeychain(session, {
+      onNotReady: () => onProgress?.('node-starting'),
+    });
     const hydratedSession = this.hydrateKeychain(session, keychainResource);
 
-    onProgress?.('loading-workspace');
+    if (!conversationsWaiting) {
+      onProgress?.('loading-workspace');
+    }
 
     const conversations = await conversationsPromise;
 

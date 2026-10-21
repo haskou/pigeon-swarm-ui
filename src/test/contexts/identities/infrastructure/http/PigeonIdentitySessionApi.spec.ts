@@ -14,6 +14,7 @@ import type { IdentityResource } from '../../../../../contexts/identities/infras
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { DeviceIdentityVaultSession } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultSession';
 import type { DeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVaultStore';
+import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 
 import { DeviceRemovedError } from '../../../../../contexts/identities/domain/DeviceRemovedError';
 import { RevokedDeviceSealedSecretPublisherError } from '../../../../../contexts/identities/domain/errors/RevokedDeviceSealedSecretPublisherError';
@@ -32,6 +33,7 @@ import {
   decodeBase64Url,
   encodeBase64Url,
 } from '../../../../../shared/infrastructure/encoding/base64url';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { copy } from '../../../../../shared/presentation/i18n/copy';
 
 const passthroughRoot = {
@@ -279,6 +281,137 @@ describe(PigeonIdentitySessionApi.name, () => {
         passthroughRecovery,
       ).unlock(currentIdentity.id, 'wrong password'),
     ).rejects.toThrow(copy.auth.invalidLogin);
+  });
+
+  describe('identity lookup on sign-in', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('waits out a node whose replicated state is still opening before resolving the identity', async () => {
+      const keyPair = await KeyPair.generate();
+      const currentIdentity = identity(keyPair.toPrimitives().publicKey);
+      const pairedCredential = fakeCredential('paired-device-credential');
+      const notReady = new HttpJsonError(
+        503,
+        'Service Unavailable',
+        JSON.stringify({ code: 503020 }),
+      );
+      const http = {
+        request: jest
+          .fn()
+          .mockRejectedValueOnce(notReady)
+          .mockRejectedValueOnce(notReady)
+          .mockResolvedValueOnce(currentIdentity),
+      } as unknown as HttpJsonClient;
+      const vault = {
+        unlock: jest.fn().mockResolvedValue({
+          authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
+          authorizationRevision: DeviceAuthorizationRevision.fromNumber(1),
+          deviceId: DeviceId.generate(),
+          material: {
+            deviceCredentialKeyPair: pairedCredential,
+            identityKeyPair: keyPair,
+            recoveryAuthorityKeyPair: await KeyPair.generate(),
+            rootKey: { getBuffer: () => SymmetricKey.generate().getBuffer() },
+          },
+          secretHandle: DeviceUnlockSecretHandle.generate(),
+        }),
+      } as unknown as DeviceIdentityVault;
+      const sessionApi = new PigeonIdentitySessionApi(
+        new PigeonIdentityGateway(http),
+        vault,
+        {
+          synchronize: jest
+            .fn()
+            .mockImplementation((session: Session) => Promise.resolve(session)),
+        } as unknown as PigeonDeviceAuthorizationApi,
+        passthroughRoot,
+        passthroughRecovery,
+      );
+
+      jest.useFakeTimers();
+      const onProgress = jest.fn();
+      const pending = sessionApi.unlock(
+        currentIdentity.id,
+        'password',
+        onProgress,
+      );
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toMatchObject({
+        deviceCredentialKeyPair: pairedCredential,
+      });
+      expect(http.request).toHaveBeenCalledTimes(3);
+      expect(onProgress.mock.calls).toEqual([
+        ['resolving-identity'],
+        ['node-starting'],
+        ['node-starting'],
+        ['decrypting-keys'],
+      ]);
+    });
+
+    it('does not retry an identity lookup that fails for another reason', async () => {
+      const http = {
+        request: jest
+          .fn()
+          .mockRejectedValue(new HttpJsonError(409, 'Conflict', '')),
+      } as unknown as HttpJsonClient;
+      const sessionApi = new PigeonIdentitySessionApi(
+        new PigeonIdentityGateway(http),
+        mock<DeviceIdentityVault>(),
+        {
+          synchronize: jest.fn(),
+        } as unknown as PigeonDeviceAuthorizationApi,
+        passthroughRoot,
+        passthroughRecovery,
+      );
+
+      jest.useFakeTimers();
+      const settled = expect(
+        sessionApi.unlock('identity-1', 'password'),
+      ).rejects.toBeInstanceOf(HttpJsonError);
+      await jest.runAllTimersAsync();
+      await settled;
+      expect(http.request).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports the not-ready error once the identity lookup exhausts its retry budget', async () => {
+      const http = {
+        request: jest
+          .fn()
+          .mockRejectedValue(
+            new HttpJsonError(
+              503,
+              'Service Unavailable',
+              JSON.stringify({ code: 503020 }),
+            ),
+          ),
+      } as unknown as HttpJsonClient;
+      const sessionApi = new PigeonIdentitySessionApi(
+        new PigeonIdentityGateway(http),
+        mock<DeviceIdentityVault>(),
+        {
+          synchronize: jest.fn(),
+        } as unknown as PigeonDeviceAuthorizationApi,
+        passthroughRoot,
+        passthroughRecovery,
+      );
+      const onProgress = jest.fn();
+
+      jest.useFakeTimers();
+      const rejected = jest.fn();
+      const pending = sessionApi.unlock('identity-1', 'password', onProgress);
+      void pending.catch(rejected);
+
+      await jest.advanceTimersByTimeAsync(15_749);
+      expect(rejected).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(rejected).toHaveBeenCalledWith(expect.any(HttpJsonError));
+      expect(http.request).toHaveBeenCalledTimes(9);
+      expect(onProgress).not.toHaveBeenCalledWith('decrypting-keys');
+    });
   });
 
   it('unlocks a paired device while the identity document is still at revision 0', async () => {
