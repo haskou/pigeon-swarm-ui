@@ -1,10 +1,13 @@
+import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import { isReplicatedStateNotReady } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import { waitBeforeRetry } from '../../../../shared/infrastructure/http/waitBeforeRetry';
 import { CommunityListNotSettledError } from './CommunityListNotSettledError';
 
-// A node that was restarted can answer 503020, or an empty list, until its
-// replicated state has opened; that took over a minute on a loaded host. The
-// first waits are above the 1.5s startup read cache, so each read is fresh.
+// A node that was restarted can refuse the connection, or a proxy in front of
+// it answer 502/503/504, until it listens; it can then answer 503020, or an
+// empty list, until its replicated state has opened; that took over a minute
+// on a loaded host. The first waits are above the 1.5s startup read cache, so
+// each read is fresh.
 const settleDelaysMs = [2000, 3000, 5000, 5000, 5000, 10000, 10000, 10000];
 // Wall time after which the loop gives up, whatever the delays and the 503020
 // retries inside each read add up to. The last read may still run up to the
@@ -49,7 +52,21 @@ async function abortable<T>(
   });
 }
 
-type ReadOutcome<T> = { communities?: T[]; notReady?: unknown };
+type ReadOutcome<T> = { communities?: T[]; unavailable?: unknown };
+
+/**
+ * True for the failures of a node that is restarting: a refused connection
+ * (fetch rejects with a TypeError), a 502, 503 or 504 answer, or 503020.
+ */
+function isNodeStarting(caught: unknown): boolean {
+  return (
+    caught instanceof TypeError ||
+    (caught instanceof HttpJsonError &&
+      caught.status >= 502 &&
+      caught.status <= 504) ||
+    isReplicatedStateNotReady(caught)
+  );
+}
 
 async function readOnce<T>(
   read: (signal: AbortSignal) => Promise<T[]>,
@@ -60,9 +77,9 @@ async function readOnce<T>(
   try {
     return { communities: await abortable(read(signal), signal) };
   } catch (caught: unknown) {
-    if (!isReplicatedStateNotReady(caught)) throw caught;
+    if (signal.aborted || !isNodeStarting(caught)) throw caught;
 
-    return { notReady: caught };
+    return { unavailable: caught };
   }
 }
 
@@ -78,10 +95,11 @@ type ReadCommunitiesUntilSettledOptions<T> = {
 };
 
 /**
- * Reads the community list until the node has settled it. A 503020 answer is
- * read again. An empty list is final for a user this device never saw with a
+ * Reads the community list until the node has settled it. A node that is
+ * restarting (a refused connection, a 502, 503 or 504 answer, 503020) is read
+ * again. An empty list is final for a user this device never saw with a
  * community; for one it did, it may be the node's state still opening, so it is
- * read again. When the delays are spent, the 503020 failure or a
+ * read again. When the delays are spent, the last startup failure or a
  * {@link CommunityListNotSettledError} is thrown: an empty list is never
  * reported for a device that had communities.
  */
@@ -105,7 +123,7 @@ export async function readCommunitiesUntilSettled<T>({
     }
 
     if (delayMs === undefined) {
-      throw outcome.notReady ?? new CommunityListNotSettledError();
+      throw outcome.unavailable ?? new CommunityListNotSettledError();
     }
 
     onWaiting?.();
