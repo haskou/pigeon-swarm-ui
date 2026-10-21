@@ -403,6 +403,7 @@ export const es = {
     confirmDeleteChannel: 'Confirmar borrado',
     confirmDeleteRole: 'Confirmar borrado',
     confirmKickMember: 'Confirmar expulsión',
+    continueWithoutCommunities: 'Continuar sin comunidades',
     create: 'Crear comunidad',
     createBody:
       'Crea una comunidad dentro de una de tus redes. Puedes definir su visibilidad, canales iniciales y permisos de unión.',
@@ -581,6 +582,8 @@ export const es = {
     noModerationLogs: 'Aún no hay registros de moderación.',
     noPrivateNetwork:
       'No hay una red privada disponible. Las comunidades privadas solo se pueden crear dentro de una red privada.',
+    notSettled:
+      'Este dispositivo mostró comunidades tuyas, pero el nodo todavía no muestra ninguna. Puede que se abandonaran o borraran en otro dispositivo, o que el nodo aún las esté abriendo.',
     openAvatar: 'Abrir avatar de comunidad',
     openBanner: 'Abrir banner de comunidad',
     owner: 'Propietario',

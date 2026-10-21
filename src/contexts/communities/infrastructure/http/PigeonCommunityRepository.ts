@@ -217,9 +217,11 @@ export class PigeonCommunityRepository implements CommunityRepository {
 
   public async search(
     actorIdentityId: CommunityIdentityId,
+    options: { signal?: AbortSignal } = {},
   ): Promise<Community[]> {
     const resources = await this.gateway.listCommunities(
       this.contexts.find(actorIdentityId),
+      options,
     );
 
     return resources.map((resource) => this.mapper.fromPrimitives(resource));

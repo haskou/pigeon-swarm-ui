@@ -205,6 +205,9 @@ function App(): ReactElement {
             communitiesError={communities.error}
             communitiesLoading={communities.loading}
             onCommunitiesReload={communities.reload}
+            onContinueWithoutCommunities={
+              communities.continueWithoutCommunities
+            }
             setCommunities={setCommunities}
             setConversations={setConversations}
             pendingCommunityInvite={pendingCommunityInvite}

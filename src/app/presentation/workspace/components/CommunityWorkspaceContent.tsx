@@ -54,6 +54,8 @@ type CommunityWorkspaceContentProps = {
   >[0]['onCommunityChannelsUpdated'];
   onCommunityLeft: (community: Community) => void;
   onCommunityUpdated: (community: Community) => void;
+  /** Set while the list is not settled for a device that listed communities. */
+  onContinueWithoutCommunities: (() => Promise<void>) | null;
   onInvitationAccept: (notification: NotificationResource) => void;
   onKeychainPublished: (
     identityId: string,
@@ -116,6 +118,7 @@ export function CommunityWorkspaceContent({
   onCommunityChannelsUpdated,
   onCommunityLeft,
   onCommunityUpdated,
+  onContinueWithoutCommunities,
   onInvitationAccept,
   onKeychainPublished,
   onLogout,
@@ -148,13 +151,24 @@ export function CommunityWorkspaceContent({
         {error ? (
           <div className="flex flex-col items-center gap-4">
             <p role="alert">{error.message}</p>
-            <button
-              type="button"
-              onClick={onCommunitiesRetry}
-              className="glass-button rounded-xl bg-fuchsia-500 px-5 py-2 text-sm font-black text-white"
-            >
-              {copy.communities.retryLoad}
-            </button>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={onCommunitiesRetry}
+                className="glass-button rounded-xl bg-fuchsia-500 px-5 py-2 text-sm font-black text-white"
+              >
+                {copy.communities.retryLoad}
+              </button>
+              {onContinueWithoutCommunities ? (
+                <button
+                  type="button"
+                  onClick={() => void onContinueWithoutCommunities()}
+                  className="glass-button rounded-xl px-5 py-2 text-sm font-black text-white"
+                >
+                  {copy.communities.continueWithoutCommunities}
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : (
           copy.communities.empty

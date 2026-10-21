@@ -2,6 +2,7 @@ import type { BlobRequestInit } from './BlobRequestInit';
 
 import { isIndependentClient } from '../client/isIndependentClient';
 import { ApiUrlBuilder } from './ApiUrlBuilder';
+import { HttpConnectionError } from './HttpConnectionError';
 import { HttpJsonError } from './HttpJsonError';
 
 export class HttpJsonClient {
@@ -99,8 +100,24 @@ export class HttpJsonClient {
       : {};
   }
 
+  /**
+   * A TypeError from `fetch` means the request never reached the node; an
+   * abort and any other rejection pass through unchanged.
+   */
+  private async send(path: string, init: RequestInit): Promise<Response> {
+    try {
+      return await fetch(this.urls.build(path), init);
+    } catch (caught: unknown) {
+      if (caught instanceof TypeError) {
+        throw new HttpConnectionError(caught);
+      }
+
+      throw caught;
+    }
+  }
+
   public async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(this.urls.build(path), {
+    const response = await this.send(path, {
       ...init,
       cache: init.cache ?? 'no-store',
       ...this.isolationInit(),
@@ -129,7 +146,7 @@ export class HttpJsonClient {
     init: BlobRequestInit = {},
   ): Promise<Blob> {
     const { onDownloadProgress, ...requestInit } = init;
-    const response = await fetch(this.urls.build(path), {
+    const response = await this.send(path, {
       ...requestInit,
       cache: requestInit.cache ?? 'no-store',
       ...this.isolationInit(),
