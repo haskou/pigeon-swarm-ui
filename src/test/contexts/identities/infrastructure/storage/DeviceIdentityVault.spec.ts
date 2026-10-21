@@ -65,8 +65,10 @@ class MemoryStore implements DeviceIdentityVaultStore {
     return Promise.resolve();
   }
 
-  public insert(record: DeviceIdentityVaultRecord): Promise<void> {
-    if (this.records.has(record.identityId)) {
+  public arm(record: DeviceIdentityVaultRecord): Promise<void> {
+    const existing = this.records.get(record.identityId);
+
+    if (existing && existing.firstKeychainPublish !== 'armed') {
       return Promise.reject(new Error('Identity vault record already exists.'));
     }
 
@@ -75,21 +77,44 @@ class MemoryStore implements DeviceIdentityVaultStore {
     return Promise.resolve();
   }
 
-  public setFirstKeychainPublish(
-    identityId: IdentityId,
-    state: FirstKeychainPublishState,
-  ): Promise<void> {
+  public clearFirstKeychainPublish(identityId: IdentityId): Promise<void> {
     const record = this.records.get(identityId.valueOf());
 
-    if (record) {
-      this.records.set(identityId.valueOf(), {
-        ...record,
-        firstKeychainPublish: state,
-        updatedAt: Date.now(),
-      });
+    if (!record) {
+      return Promise.reject(new Error('No vault record holds the marker.'));
     }
 
+    this.records.set(identityId.valueOf(), {
+      ...record,
+      firstKeychainPublish: 'none',
+      updatedAt: Date.now(),
+    });
+
     return Promise.resolve();
+  }
+
+  public transitionFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    const record = this.records.get(identityId.valueOf());
+
+    if (!record) {
+      return Promise.reject(new Error('No vault record holds the marker.'));
+    }
+
+    if ((record.firstKeychainPublish ?? 'none') !== from) {
+      return Promise.resolve(false);
+    }
+
+    this.records.set(identityId.valueOf(), {
+      ...record,
+      firstKeychainPublish: to,
+      updatedAt: Date.now(),
+    });
+
+    return Promise.resolve(true);
   }
 
   public find(
@@ -384,6 +409,54 @@ describe(DeviceIdentityVault.name, () => {
       ).resolves.toBe('none');
     });
 
+    it('arms again over a record left armed by an earlier creation attempt', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      const first = await vault.register({
+        ...source,
+        firstKeychainPublish: 'armed',
+        password,
+      });
+
+      const second = await vault.register({
+        ...source,
+        firstKeychainPublish: 'armed',
+        password,
+      });
+
+      expect(second.deviceId.valueOf()).not.toBe(first.deviceId.valueOf());
+      await expect(store.find(source.identityId)).resolves.toMatchObject({
+        deviceId: second.deviceId.valueOf(),
+        firstKeychainPublish: 'armed',
+      });
+    });
+
+    it('refuses to arm again once the first publish has started', async () => {
+      const store = new MemoryStore();
+      const source = await fixture();
+      const vault = new DeviceIdentityVault(store);
+      const first = await vault.register({
+        ...source,
+        firstKeychainPublish: 'armed',
+        password,
+      });
+      await vault.transitionFirstKeychainPublish(
+        source.identityId,
+        'armed',
+        'ambiguous',
+      );
+
+      await expect(
+        vault.register({ ...source, firstKeychainPublish: 'armed', password }),
+      ).rejects.toThrow();
+
+      await expect(store.find(source.identityId)).resolves.toMatchObject({
+        deviceId: first.deviceId.valueOf(),
+        firstKeychainPublish: 'ambiguous',
+      });
+    });
+
     it('keeps the marker through a password change', async () => {
       const store = new MemoryStore();
       const source = await fixture();
@@ -410,7 +483,11 @@ describe(DeviceIdentityVault.name, () => {
         firstKeychainPublish: 'armed',
         password,
       });
-      await vault.setFirstKeychainPublish(source.identityId, 'ambiguous');
+      await vault.transitionFirstKeychainPublish(
+        source.identityId,
+        'armed',
+        'ambiguous',
+      );
 
       await vault.changePassword(source.identityId, password, nextPassword);
 
@@ -429,7 +506,7 @@ describe(DeviceIdentityVault.name, () => {
         password,
       });
 
-      await vault.setFirstKeychainPublish(source.identityId, 'none');
+      await vault.clearFirstKeychainPublish(source.identityId);
 
       await expect(
         vault.firstKeychainPublishState(source.identityId),
@@ -462,7 +539,11 @@ describe(DeviceIdentityVault.name, () => {
         firstKeychainPublish: 'armed',
         password,
       });
-      await vault.setFirstKeychainPublish(source.identityId, 'ambiguous');
+      await vault.transitionFirstKeychainPublish(
+        source.identityId,
+        'armed',
+        'ambiguous',
+      );
 
       await vault.register({ ...source, password });
 
@@ -476,11 +557,13 @@ describe(DeviceIdentityVault.name, () => {
       const source = await fixture();
       const vault = new DeviceIdentityVault(store);
       const save = jest.spyOn(store, 'save');
-      const setMarker = jest.spyOn(store, 'setFirstKeychainPublish');
+      const clear = jest.spyOn(store, 'clearFirstKeychainPublish');
+      const transition = jest.spyOn(store, 'transitionFirstKeychainPublish');
 
       await vault.register({ ...source, password });
 
-      expect(setMarker).not.toHaveBeenCalled();
+      expect(clear).not.toHaveBeenCalled();
+      expect(transition).not.toHaveBeenCalled();
       expect(save.mock.calls[0][0].firstKeychainPublish).toBeUndefined();
     });
   });

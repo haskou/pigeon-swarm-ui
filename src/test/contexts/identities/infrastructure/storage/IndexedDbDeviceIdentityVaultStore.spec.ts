@@ -28,12 +28,12 @@ function recordFor(
 }
 
 describe(IndexedDbDeviceIdentityVaultStore.name, () => {
-  it('sets the first-publish marker and keeps the rest of the record', async () => {
+  it('clears the first-publish marker and keeps the rest of the record', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
     await store.save(recordFor(identityId.valueOf()));
 
-    await store.setFirstKeychainPublish(identityId, 'none');
+    await store.clearFirstKeychainPublish(identityId);
 
     await expect(store.find(identityId)).resolves.toMatchObject({
       envelope: 'envelope-1',
@@ -42,12 +42,79 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     });
   });
 
+  it('moves the marker when it still holds the expected state', async () => {
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    await store.save(recordFor(identityId.valueOf()));
+
+    await expect(
+      store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous'),
+    ).resolves.toBe(true);
+
+    await expect(store.find(identityId)).resolves.toMatchObject({
+      envelope: 'envelope-1',
+      firstKeychainPublish: 'ambiguous',
+    });
+  });
+
+  it('lets only one of two racing tabs move an armed marker to ambiguous', async () => {
+    const firstTab = new IndexedDbDeviceIdentityVaultStore();
+    const secondTab = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    await firstTab.save(recordFor(identityId.valueOf()));
+
+    const outcomes = await Promise.all([
+      firstTab.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous'),
+      secondTab.transitionFirstKeychainPublish(
+        identityId,
+        'armed',
+        'ambiguous',
+      ),
+    ]);
+
+    expect(outcomes.filter(Boolean)).toHaveLength(1);
+    await expect(firstTab.find(identityId)).resolves.toMatchObject({
+      firstKeychainPublish: 'ambiguous',
+    });
+  });
+
+  it('leaves a marker that no longer holds the expected state untouched', async () => {
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    await store.save(
+      recordFor(identityId.valueOf(), { firstKeychainPublish: 'none' }),
+    );
+
+    await expect(
+      store.transitionFirstKeychainPublish(identityId, 'ambiguous', 'armed'),
+    ).resolves.toBe(false);
+
+    await expect(store.find(identityId)).resolves.toMatchObject({
+      firstKeychainPublish: 'none',
+      updatedAt: 1,
+    });
+  });
+
+  it('reads a record without a marker as none for a transition', async () => {
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    const unmarked = recordFor(identityId.valueOf());
+    delete unmarked.firstKeychainPublish;
+    await store.save(unmarked);
+
+    await expect(
+      store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous'),
+    ).resolves.toBe(false);
+
+    await expect(store.find(identityId)).resolves.toEqual(unmarked);
+  });
+
   it('keeps a marker set by a publish when a password change writes a stale copy', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
     const expected = recordFor(identityId.valueOf());
     await store.save(expected);
-    await store.setFirstKeychainPublish(identityId, 'none');
+    await store.clearFirstKeychainPublish(identityId);
 
     await store.replaceProtection(
       expected,
@@ -65,7 +132,7 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     const identityId = IdentityId.fromString(randomUUID());
     const expected = recordFor(identityId.valueOf());
     await store.save(expected);
-    await store.setFirstKeychainPublish(identityId, 'ambiguous');
+    await store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous');
 
     await store.replaceProtection(
       expected,
@@ -78,39 +145,77 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     });
   });
 
-  it('inserts a new record with its marker', async () => {
+  it('arms a new record', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
 
-    await store.insert(recordFor(identityId.valueOf()));
+    await store.arm(recordFor(identityId.valueOf()));
 
     await expect(store.find(identityId)).resolves.toMatchObject({
       firstKeychainPublish: 'armed',
     });
   });
 
-  it('refuses to insert over an existing record and leaves its marker alone', async () => {
+  it('replaces a record whose first publish is still armed', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
-    await store.save(
-      recordFor(identityId.valueOf(), { firstKeychainPublish: 'none' }),
+    await store.arm(recordFor(identityId.valueOf()));
+
+    await store.arm(
+      recordFor(identityId.valueOf(), {
+        deviceId: 'device-2',
+        envelope: 'envelope-2',
+      }),
     );
 
-    await expect(
-      store.insert(recordFor(identityId.valueOf())),
-    ).rejects.toThrow();
-
     await expect(store.find(identityId)).resolves.toMatchObject({
-      firstKeychainPublish: 'none',
+      deviceId: 'device-2',
+      envelope: 'envelope-2',
+      firstKeychainPublish: 'armed',
     });
+  });
+
+  it.each(['none', 'ambiguous', undefined] as const)(
+    'refuses to arm over a record whose marker is %s and leaves it alone',
+    async (firstKeychainPublish) => {
+      const store = new IndexedDbDeviceIdentityVaultStore();
+      const identityId = IdentityId.fromString(randomUUID());
+      const existing = recordFor(identityId.valueOf(), {
+        firstKeychainPublish,
+      });
+      if (!firstKeychainPublish) delete existing.firstKeychainPublish;
+      await store.save(existing);
+
+      await expect(
+        store.arm(recordFor(identityId.valueOf(), { envelope: 'envelope-2' })),
+      ).rejects.toThrow();
+
+      await expect(store.find(identityId)).resolves.toEqual(existing);
+    },
+  );
+
+  it('refuses to arm over a record that is not version 2', async () => {
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const identityId = IdentityId.fromString(randomUUID());
+    const legacy = {
+      ...recordFor(identityId.valueOf()),
+      version: 1,
+    } as unknown as DeviceIdentityVaultRecord;
+    await store.save(legacy);
+
+    await expect(
+      store.arm(recordFor(identityId.valueOf(), { envelope: 'envelope-2' })),
+    ).rejects.toThrow();
+    await expect(store.find(identityId)).resolves.toEqual(legacy);
   });
 
   it('refuses a marker write for an identity that has no vault record', async () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
 
+    await expect(store.clearFirstKeychainPublish(identityId)).rejects.toThrow();
     await expect(
-      store.setFirstKeychainPublish(identityId, 'ambiguous'),
+      store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous'),
     ).rejects.toThrow();
     await expect(store.find(identityId)).resolves.toBeUndefined();
   });
@@ -124,8 +229,9 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     } as unknown as DeviceIdentityVaultRecord);
 
     await expect(
-      store.setFirstKeychainPublish(identityId, 'ambiguous'),
+      store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous'),
     ).rejects.toThrow();
+    await expect(store.clearFirstKeychainPublish(identityId)).rejects.toThrow();
     await expect(store.find(identityId)).resolves.toMatchObject({
       firstKeychainPublish: 'armed',
     });
@@ -135,7 +241,7 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
     await store.save(recordFor(identityId.valueOf()));
-    await store.setFirstKeychainPublish(identityId, 'ambiguous');
+    await store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous');
 
     const unmarked = recordFor(identityId.valueOf(), {
       envelope: 'envelope-2',

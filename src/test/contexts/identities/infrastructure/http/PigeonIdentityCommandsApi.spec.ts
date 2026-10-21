@@ -513,4 +513,28 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     ).rejects.toBe(refusal);
     expect(deviceVault.delete).toHaveBeenCalledTimes(1);
   });
+
+  it('reports the node refusal, not the cleanup failure, when forgetting the local identity fails', async () => {
+    const refusal = new HttpJsonError(
+      403,
+      'Forbidden',
+      JSON.stringify({ code: 403011, httpStatus: 403 }),
+    );
+    const http = {
+      request: jest.fn().mockRejectedValue(refusal),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+    jest
+      .mocked(deviceVault.delete)
+      .mockRejectedValueOnce(new Error('Vault delete failed.'));
+
+    await expect(
+      created(
+        http,
+        deviceVault,
+        IdentityRegistrationCode.fromString(registrationCode),
+      ),
+    ).rejects.toBe(refusal);
+    expect(deviceVault.delete).toHaveBeenCalledTimes(1);
+  });
 });
