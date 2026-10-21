@@ -81,6 +81,56 @@ describe('readCommunitiesUntilSettled', () => {
     ).rejects.toBeInstanceOf(HttpJsonError);
   });
 
+  it.each([
+    ['a 502 answer', new HttpJsonError(502, 'Bad Gateway', '')],
+    ['a 503 answer without a code', new HttpJsonError(503, 'Unavailable', '')],
+    ['a 504 answer', new HttpJsonError(504, 'Gateway Timeout', '')],
+    ['a refused connection', new TypeError('Failed to fetch')],
+  ])(
+    'keeps reading past %s of a node that is starting',
+    async (_name, failure) => {
+      const read = jest
+        .fn()
+        .mockRejectedValueOnce(failure)
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce([community]);
+      const waiting = jest.fn();
+
+      await expect(
+        readCommunitiesUntilSettled({
+          delaysMs,
+          hadCommunities: false,
+          onWaiting: waiting,
+          read,
+        }),
+      ).resolves.toEqual([community]);
+      expect(read).toHaveBeenCalledTimes(3);
+      expect(waiting).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('throws the last startup failure when the budget is spent', async () => {
+    const failure = new TypeError('Failed to fetch');
+    const read = jest.fn().mockRejectedValue(failure);
+
+    await expect(
+      readCommunitiesUntilSettled({ delaysMs, hadCommunities: true, read }),
+    ).rejects.toBe(failure);
+    expect(read).toHaveBeenCalledTimes(delaysMs.length + 1);
+  });
+
+  it.each([
+    ['a 500 answer', new HttpJsonError(500, 'Internal Server Error', '')],
+    ['a 404 answer', new HttpJsonError(404, 'Not Found', '')],
+  ])('does not retry %s', async (_name, failure) => {
+    const read = jest.fn().mockRejectedValue(failure);
+
+    await expect(
+      readCommunitiesUntilSettled({ delaysMs, hadCommunities: true, read }),
+    ).rejects.toBe(failure);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry other failures', async () => {
     const read = jest.fn().mockRejectedValue(new Error('offline'));
 

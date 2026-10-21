@@ -185,6 +185,18 @@ describe(toUserErrorMessage.name, () => {
     );
   });
 
+  it('explains a node refusing an identity id that is not canonical (400080)', () => {
+    const error = new HttpJsonError(
+      400,
+      'Bad Request',
+      JSON.stringify({ code: 400080, httpStatus: 400 }),
+    );
+
+    expect(toUserErrorMessage(error, 'fallback')).toBe(
+      copy.errors.backend['400080'],
+    );
+  });
+
   it('explains that direct and private community creation needs a private network', () => {
     const error = new HttpJsonError(
       409,
