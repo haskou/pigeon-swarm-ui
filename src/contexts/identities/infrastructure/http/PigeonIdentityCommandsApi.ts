@@ -292,7 +292,12 @@ export class PigeonIdentityCommandsApi {
         },
       );
     } catch (error) {
-      await this.vault.delete(IdentityId.fromString(primitives.id));
+      // The refusal is what the user must see. A record this cleanup leaves
+      // behind is still armed, since no first keychain was sent, so a retry
+      // replaces it.
+      await this.vault
+        .delete(IdentityId.fromString(primitives.id))
+        .catch(() => undefined);
       throw error;
     }
 

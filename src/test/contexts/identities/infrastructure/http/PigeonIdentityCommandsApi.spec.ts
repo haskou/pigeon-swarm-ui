@@ -73,7 +73,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
     } as unknown as RequestSigner;
     const vault = {
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
       register: jest.fn().mockImplementation(({ material }) =>
         Promise.resolve({
           authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
@@ -200,7 +200,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
 
   function vault(): DeviceIdentityVault {
     return {
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
       register: jest.fn().mockImplementation(({ material }) =>
         Promise.resolve({
           authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
@@ -419,7 +419,7 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
 
   function vault(): DeviceIdentityVault {
     return {
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
       register: jest.fn().mockImplementation(({ material }) =>
         Promise.resolve({
           authorizationEpoch: DeviceAuthorizationEpoch.genesis(),

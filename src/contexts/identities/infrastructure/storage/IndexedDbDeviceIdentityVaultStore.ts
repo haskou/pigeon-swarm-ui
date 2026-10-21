@@ -50,6 +50,59 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     }
   }
 
+  // Moves the marker to `to` in one transaction, only while it still holds
+  // `from` (a record without a marker holds none); an undefined `from` writes
+  // unconditionally. Answers whether the marker was written.
+  private async writeFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState | undefined,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    const database = await this.open();
+
+    try {
+      return await new Promise<boolean>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(identityId.valueOf());
+        let written = false;
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const record = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          if (record?.version !== 2) {
+            transaction.abort();
+            reject(
+              new Error(
+                'No version 2 vault record holds the first-publish marker, so it was not set.',
+              ),
+            );
+
+            return;
+          }
+
+          if (from && (record.firstKeychainPublish ?? 'none') !== from) {
+            return;
+          }
+
+          store.put({
+            ...record,
+            firstKeychainPublish: to,
+            updatedAt: Date.now(),
+          } satisfies DeviceIdentityVaultRecord);
+          written = true;
+        });
+        transaction.addEventListener('complete', () => resolve(written));
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
+  }
+
   public async advanceAuthorization(
     identityId: IdentityId,
     previousRevision: DeviceAuthorizationRevision,
@@ -117,46 +170,18 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     );
   }
 
-  public async setFirstKeychainPublish(
+  public async clearFirstKeychainPublish(
     identityId: IdentityId,
-    state: FirstKeychainPublishState,
   ): Promise<void> {
-    const database = await this.open();
+    await this.writeFirstKeychainPublish(identityId, undefined, 'none');
+  }
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.get(identityId.valueOf());
-
-        request.addEventListener('error', () => reject(request.error));
-        request.addEventListener('success', () => {
-          const record = request.result as
-            | DeviceIdentityVaultRecord
-            | undefined;
-
-          if (record?.version !== 2) {
-            reject(
-              new Error(
-                'No version 2 vault record holds the first-publish marker, so it was not set.',
-              ),
-            );
-
-            return;
-          }
-
-          store.put({
-            ...record,
-            firstKeychainPublish: state,
-            updatedAt: Date.now(),
-          } satisfies DeviceIdentityVaultRecord);
-        });
-        transaction.addEventListener('complete', () => resolve());
-        transaction.addEventListener('error', () => reject(transaction.error));
-      });
-    } finally {
-      database.close();
-    }
+  public async transitionFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    return await this.writeFirstKeychainPublish(identityId, from, to);
   }
 
   public async find(
@@ -202,8 +227,43 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     }
   }
 
-  public async insert(record: DeviceIdentityVaultRecord): Promise<void> {
-    await this.request('readwrite', (store) => store.add(record));
+  public async arm(record: DeviceIdentityVaultRecord): Promise<void> {
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(record.identityId);
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const existing = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          // Only a record whose first publish never started may be replaced:
+          // an armed record sent no first keychain, so arming again cannot
+          // reopen a publish that may already have reached the node.
+          if (
+            existing &&
+            (existing.version !== 2 ||
+              existing.firstKeychainPublish !== 'armed')
+          ) {
+            transaction.abort();
+            reject(new Error('Vault record already exists.'));
+
+            return;
+          }
+
+          store.put(record);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+      });
+    } finally {
+      database.close();
+    }
   }
 
   public async replaceProtection(

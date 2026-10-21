@@ -132,7 +132,11 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     const identityId = IdentityId.fromString(randomUUID());
     const expected = recordFor(identityId.valueOf());
     await store.save(expected);
-    await store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous');
+    await store.transitionFirstKeychainPublish(
+      identityId,
+      'armed',
+      'ambiguous',
+    );
 
     await store.replaceProtection(
       expected,
@@ -183,7 +187,9 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
       const existing = recordFor(identityId.valueOf(), {
         firstKeychainPublish,
       });
+
       if (!firstKeychainPublish) delete existing.firstKeychainPublish;
+
       await store.save(existing);
 
       await expect(
@@ -241,7 +247,11 @@ describe(IndexedDbDeviceIdentityVaultStore.name, () => {
     const store = new IndexedDbDeviceIdentityVaultStore();
     const identityId = IdentityId.fromString(randomUUID());
     await store.save(recordFor(identityId.valueOf()));
-    await store.transitionFirstKeychainPublish(identityId, 'armed', 'ambiguous');
+    await store.transitionFirstKeychainPublish(
+      identityId,
+      'armed',
+      'ambiguous',
+    );
 
     const unmarked = recordFor(identityId.valueOf(), {
       envelope: 'envelope-2',

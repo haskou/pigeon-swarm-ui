@@ -181,11 +181,27 @@ export class DeviceIdentityVault {
     return record?.firstKeychainPublish ?? 'none';
   }
 
-  public async setFirstKeychainPublish(
+  /** Clears the marker: the first keychain is on the node, or never may be. */
+  public async clearFirstKeychainPublish(
     identityId: IdentityId,
-    state: FirstKeychainPublishState,
   ): Promise<void> {
-    await this.store.setFirstKeychainPublish(identityId, state);
+    await this.store.clearFirstKeychainPublish(identityId);
+  }
+
+  /**
+   * Moves the marker from `from` to `to` atomically and answers whether it
+   * moved. A false answer means another tab changed it first.
+   */
+  public async transitionFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    return await this.store.transitionFirstKeychainPublish(
+      identityId,
+      from,
+      to,
+    );
   }
 
   public async register(input: {
@@ -222,11 +238,13 @@ export class DeviceIdentityVault {
       firstKeychainPublish: input.firstKeychainPublish,
     };
 
-    // A first publish arms a new record only; an existing record is refused
-    // rather than re-armed. Other registrations overwrite the record and keep
-    // the marker it already holds.
+    // A first publish arms a new record, or replaces one still armed by an
+    // earlier creation attempt that never sent its first keychain; a record
+    // whose first publish started, or any other record, is refused rather
+    // than re-armed. Other registrations overwrite the record and keep the
+    // marker it already holds.
     if (input.firstKeychainPublish === 'armed') {
-      await this.store.insert(record);
+      await this.store.arm(record);
     } else {
       await this.store.save(record);
     }
