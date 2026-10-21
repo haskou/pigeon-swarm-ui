@@ -66,10 +66,10 @@ describe('loadCommunityList', () => {
     const out = sinks();
 
     rememberCommunitiesSeen('identity-a');
-    const read = jest.fn().mockImplementation(async () => {
+    const read = jest.fn().mockImplementation(() => {
       loads.cancel();
 
-      return [];
+      return Promise.resolve([]);
     });
 
     await loadCommunityList({

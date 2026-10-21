@@ -6,14 +6,72 @@ import { CommunityListNotSettledError } from './CommunityListNotSettledError';
 // replicated state has opened; that took over a minute on a loaded host. The
 // first waits are above the 1.5s startup read cache, so each read is fresh.
 const settleDelaysMs = [2000, 3000, 5000, 5000, 5000, 10000, 10000, 10000];
+// Wall time after which the loop gives up, whatever the delays and the 503020
+// retries inside each read add up to. The last read may still run up to the
+// shared 503020 budget past it.
+const settleBudgetMs = 50_000;
+
+function nextDelayMs(
+  delaysMs: number[],
+  attempt: number,
+  deadline: number,
+): number | undefined {
+  const delayMs = delaysMs[attempt];
+
+  return delayMs !== undefined && Date.now() + delayMs <= deadline
+    ? delayMs
+    : undefined;
+}
+
+function isSettled<T>(
+  outcome: ReadOutcome<T>,
+  hadCommunities: boolean,
+): boolean {
+  return (
+    outcome.communities !== undefined &&
+    (outcome.communities.length > 0 || !hadCommunities)
+  );
+}
+
+async function abortable<T>(
+  pending: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  signal.throwIfAborted();
+
+  return await new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(signal.reason);
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    pending.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', onAbort);
+    });
+  });
+}
+
+type ReadOutcome<T> = { communities?: T[]; notReady?: unknown };
+
+async function readOnce<T>(
+  read: (signal: AbortSignal) => Promise<T[]>,
+  signal: AbortSignal,
+): Promise<ReadOutcome<T>> {
+  try {
+    return { communities: await abortable(read(signal), signal) };
+  } catch (caught: unknown) {
+    if (!isReplicatedStateNotReady(caught)) throw caught;
+
+    return { notReady: caught };
+  }
+}
 
 type ReadCommunitiesUntilSettledOptions<T> = {
+  budgetMs?: number;
   delaysMs?: number[];
   /** True when this device already listed a community for the identity. */
   hadCommunities: boolean;
   /** Called before each wait, so the caller can keep a loading state. */
   onWaiting?: () => void;
-  read: () => Promise<T[]>;
+  read: (signal: AbortSignal) => Promise<T[]>;
   signal?: AbortSignal;
 };
 
@@ -26,33 +84,29 @@ type ReadCommunitiesUntilSettledOptions<T> = {
  * reported for a device that had communities.
  */
 export async function readCommunitiesUntilSettled<T>({
+  budgetMs = settleBudgetMs,
   delaysMs = settleDelaysMs,
   hadCommunities,
   onWaiting,
   read,
   signal,
 }: ReadCommunitiesUntilSettledOptions<T>): Promise<T[]> {
+  const abort = signal ?? new AbortController().signal;
+  const deadline = Date.now() + budgetMs;
+
   for (let attempt = 0; ; attempt++) {
-    const delayMs = delaysMs[attempt];
-    let communities: T[];
+    const delayMs = nextDelayMs(delaysMs, attempt, deadline);
+    const outcome = await readOnce(read, abort);
 
-    try {
-      communities = await read();
-    } catch (caught: unknown) {
-      if (delayMs === undefined || !isReplicatedStateNotReady(caught)) {
-        throw caught;
-      }
-
-      onWaiting?.();
-      await waitBeforeRetry(delayMs, signal);
-      continue;
+    if (outcome.communities && isSettled(outcome, hadCommunities)) {
+      return outcome.communities;
     }
 
-    if (communities.length > 0 || !hadCommunities) return communities;
-
-    if (delayMs === undefined) throw new CommunityListNotSettledError();
+    if (delayMs === undefined) {
+      throw outcome.notReady ?? new CommunityListNotSettledError();
+    }
 
     onWaiting?.();
-    await waitBeforeRetry(delayMs, signal);
+    await waitBeforeRetry(delayMs, abort);
   }
 }

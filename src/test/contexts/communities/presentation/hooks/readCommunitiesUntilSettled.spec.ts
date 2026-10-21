@@ -92,14 +92,15 @@ describe('readCommunitiesUntilSettled', () => {
 
   it('stops waiting as soon as it is aborted', async () => {
     const controller = new AbortController();
-    const read = jest.fn().mockImplementation(async () => {
+    const read = jest.fn().mockImplementation(() => {
       setTimeout(() => controller.abort(new Error('stop')), 1);
 
-      return [];
+      return Promise.resolve([]);
     });
 
     await expect(
       readCommunitiesUntilSettled({
+        budgetMs: 120_000,
         delaysMs: [60_000],
         hadCommunities: true,
         read,
