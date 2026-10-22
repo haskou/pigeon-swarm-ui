@@ -87,10 +87,7 @@ test('a device whose communities were all left on another device continues witho
     // The laptop goes back to the community workspace, which it reopens at the
     // next sign-in. Left open, it would see the leave live and forget that it
     // listed communities; it is closed until then, as a device is.
-    await laptop
-      .getByRole('button', { name: communityName })
-      .first()
-      .click();
+    await laptop.getByRole('button', { name: communityName }).first().click();
     await laptop
       .getByRole('button', { name: ENCRYPTED })
       .waitFor({ timeout: SLOW });
