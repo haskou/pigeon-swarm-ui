@@ -84,6 +84,9 @@ test('a device whose communities were all left on another device continues witho
       .getByRole('button', { name: 'Open messages workspace' })
       .click();
     await pairNewDevice(laptop, phone, member);
+    // A laptop still open would see the leave live and forget that it listed
+    // communities; it is closed until the next sign-in, as a device is.
+    await laptop.goto('about:blank');
     const phoneCommunity = phone
       .getByRole('button', { name: communityName })
       .first();
