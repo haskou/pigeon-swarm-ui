@@ -60,11 +60,23 @@ export class PigeonCallParticipation {
     );
   }
 
+  /**
+   * A page being torn down cancels every request it starts that is not
+   * keepalive, so a departure neither reads the call nor asks the node for the
+   * authorization revision before it signs.
+   */
   public async leaveOnPageDeparture(
     session: Session,
     callId: string,
     declined: boolean,
   ): Promise<void> {
-    await this.api.leave(session, callId, Date.now(), declined);
+    await this.api.leaveOnPageDeparture(session, callId, Date.now(), declined);
+  }
+
+  public async endOnPageDeparture(
+    session: Session,
+    callId: string,
+  ): Promise<void> {
+    await this.api.endOnPageDeparture(session, callId, Date.now());
   }
 }

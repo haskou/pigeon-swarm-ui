@@ -4,6 +4,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { CallEventSigner } from '../../../../../contexts/calls/infrastructure/http/CallEventSigner';
 import { PigeonCallsApi } from '../../../../../contexts/calls/infrastructure/http/PigeonCallsApi';
+import { PublicMutationSigner } from '../../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { publicMutationSignerAt } from '../../../../shared/infrastructure/crypto/publicMutationSignerAt';
 
@@ -184,6 +185,72 @@ describe(PigeonCallsApi.name, () => {
     expect(participant.mock.calls[1]?.[4]).toEqual({
       predecessor: 'digest-a',
       sequence: 4,
+    });
+  });
+
+  describe('on page departure', () => {
+    /**
+     * A page that is being torn down cancels every ordinary request it still
+     * has in flight; only a keepalive request dispatched before the teardown
+     * reaches the node. The departure must therefore sign without waiting for
+     * anything, here an ordinary signature that never settles.
+     */
+    function departing() {
+      const built = build([undefined]);
+      const pending = () => new Promise<never>(() => undefined);
+
+      jest.spyOn(built.events, 'participant').mockImplementation(pending);
+      jest.spyOn(built.events, 'end').mockImplementation(pending);
+
+      return built;
+    }
+
+    it.each([
+      [true, 'declined'],
+      [false, 'left'],
+    ] as const)(
+      'dispatches a keepalive leave with declined=%s at once',
+      async (declined, state) => {
+        const { api, events, request } = departing();
+        const sign = jest
+          .spyOn(events, 'participantOnPageDeparture')
+          .mockReturnValue(mutation);
+
+        void api.leaveOnPageDeparture(session, 'call-a', 6, declined);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(sign).toHaveBeenCalledWith(
+          session,
+          'call-a',
+          state,
+          6,
+          PublicMutationSigner.FIRST_POSITION,
+        );
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.mock.calls[0]).toEqual([
+          '/calls/call-a/participants/me',
+          expect.objectContaining({ keepalive: true, method: 'DELETE' }),
+        ]);
+        expect(bodyOf(request, 0)).toEqual({ at: 6, mutation });
+      },
+    );
+
+    it('dispatches a keepalive end at once', async () => {
+      const { api, events, request } = departing();
+      const sign = jest
+        .spyOn(events, 'endOnPageDeparture')
+        .mockReturnValue(mutation);
+
+      void api.endOnPageDeparture(session, 'call-a', 8);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sign).toHaveBeenCalledWith(session, 'call-a', 8);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request.mock.calls[0]).toEqual([
+        '/calls/call-a',
+        expect.objectContaining({ keepalive: true, method: 'DELETE' }),
+      ]);
+      expect(bodyOf(request, 0)).toEqual({ at: 8, mutation });
     });
   });
 

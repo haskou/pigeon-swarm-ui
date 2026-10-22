@@ -15,12 +15,14 @@ interface Entry {
  * Reads the identity's device authorization revision from the node
  * (`GET /identity-devices/{identityId}`, the current checkpoint). One read is
  * shared by the signing calls of a short window; a failed read is never
- * cached. The result is never lower than the revision at which this device was
- * itself enrolled, which the session carries.
+ * cached. The last revision read is kept for signatures that cannot wait for
+ * a request. No answer is ever lower than the revision at which this device
+ * was itself enrolled, which the session carries.
  */
 // eslint-disable-next-line max-len
 export class DeviceAuthorizationRevisionSource implements AuthorizationRevisionSource {
   private readonly entries = new Map<string, Entry>();
+  private readonly observedRevisions = new Map<string, number>();
 
   public constructor(
     private readonly authorization: Pick<PigeonDeviceAuthorizationApi, 'find'>,
@@ -50,13 +52,25 @@ export class DeviceAuthorizationRevisionSource implements AuthorizationRevisionS
         expiresAt: this.clock() + this.ttlMs,
         revision,
       });
-      revision.catch(() => {
-        if (this.entries.get(key)?.revision === revision) {
-          this.entries.delete(key);
-        }
-      });
+      revision.then(
+        (value) => {
+          this.observedRevisions.set(key, value);
+        },
+        () => {
+          if (this.entries.get(key)?.revision === revision) {
+            this.entries.delete(key);
+          }
+        },
+      );
     }
 
     return Math.max(await revision, floor);
+  }
+
+  public observed(session: Session): number {
+    return Math.max(
+      this.observedRevisions.get(this.key(session)) ?? 0,
+      session.authorizationRevision.valueOf(),
+    );
   }
 }

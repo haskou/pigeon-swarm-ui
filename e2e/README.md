@@ -244,8 +244,13 @@ support is not proven here.
 second one from a direct conversation and navigates its page away while the call
 is still ringing. The page departure must send a signed decline, and the caller
 must see the call as declined. The node derives `declined` for a ringing
-participant, so a `left` proof for it is never recorded. Run it against a node
-that has a network, with `E2E_NETWORK_ID` when the node lists none:
+participant, so a `left` proof for it is never recorded. A second case lets the
+call ring for six seconds first, longer than the client keeps its last
+authorization revision read: the departure must still be dispatched, because a
+page being torn down cancels every request that is not keepalive, so the
+decline is signed at the revision the device last observed instead of asking
+the node again. Run it against a node that has a network, with
+`E2E_NETWORK_ID` when the node lists none:
 
 ```bash
 yarn test:e2e e2e/call-page-departure.spec.ts --project=desktop-chromium

@@ -21,6 +21,7 @@ describe(PublicMutationSigner.name, () => {
     } as unknown as Session;
     const signer = new PublicMutationSigner({
       current: () => Promise.resolve(7),
+      observed: () => 7,
     });
     const mutation = await signer.sign(
       session,
@@ -68,6 +69,7 @@ describe(PublicMutationSigner.name, () => {
     } as unknown as Session;
     const signer = new PublicMutationSigner({
       current: () => Promise.resolve(1),
+      observed: () => 1,
     });
     const intent = {
       kind: 'put' as const,
@@ -97,7 +99,7 @@ describe(PublicMutationSigner.name, () => {
       identity: { id: 'identity-1' },
     } as unknown as Session;
     const current = jest.fn().mockResolvedValueOnce(4).mockResolvedValueOnce(5);
-    const signer = new PublicMutationSigner({ current });
+    const signer = new PublicMutationSigner({ current, observed: () => 4 });
     const draft = {
       kind: 'put' as const,
       payload: { a: 1 },
@@ -119,5 +121,29 @@ describe(PublicMutationSigner.name, () => {
     expect(current).toHaveBeenCalledWith(session);
     expect(first.author.authorizationRevision).toBe(4);
     expect(second.author.authorizationRevision).toBe(5);
+  });
+
+  it('signs at the observed revision without asking for a fresh one', async () => {
+    const device = await KeyPair.generate();
+    const session = {
+      deviceCredentialKeyPair: device,
+      identity: { id: 'identity-1' },
+    } as unknown as Session;
+    const current = jest.fn();
+    const observed = jest.fn().mockReturnValue(6);
+    const signer = new PublicMutationSigner({ current, observed });
+
+    const mutation = signer.signAtObservedRevision(
+      session,
+      { kind: 'put', payload: { a: 1 }, recordId: 'record-1', store: 'pins' },
+      PublicMutationSigner.FIRST_POSITION,
+    );
+
+    expect(current).not.toHaveBeenCalled();
+    expect(observed).toHaveBeenCalledWith(session);
+    expect(mutation.author.authorizationRevision).toBe(6);
+    expect(() =>
+      PublicMutationSignature.verify(mutation, publicKeyOf(device)),
+    ).not.toThrow();
   });
 });

@@ -22,6 +22,13 @@ export class PigeonCallsFacade {
     await this.participation.end(session, callId);
   }
 
+  public async endOnPageDeparture(
+    session: Session,
+    callId: string,
+  ): Promise<void> {
+    await this.participation.endOnPageDeparture(session, callId);
+  }
+
   public async get(session: Session, callId: string): Promise<CallResource> {
     return await this.reader.find(session, callId);
   }

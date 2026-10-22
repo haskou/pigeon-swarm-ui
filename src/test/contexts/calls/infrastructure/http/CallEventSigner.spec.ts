@@ -133,4 +133,47 @@ describe(CallEventSigner.name, () => {
       ),
     ).toEqual(end.mutation);
   });
+
+  describe('on page departure', () => {
+    // A revision read that never answers: the departure must not wait for it
+    // and signs at the observed revision instead, byte for byte like the node.
+    const departing = new CallEventSigner(
+      new PublicMutationSigner({
+        current: () => new Promise<number>(() => undefined),
+        observed: () => 0,
+      }),
+    );
+
+    it('signs a participant state like the node without a revision read', () => {
+      const joined = vector('call_participant_joined');
+      const payload = joined.payload as Payload;
+
+      stubOperationId(joined.mutation);
+
+      expect(
+        departing.participantOnPageDeparture(
+          sessionOf(callee),
+          payload.callId as string,
+          'joined',
+          payload.at as number,
+          PublicMutationSigner.FIRST_POSITION,
+        ),
+      ).toEqual(joined.mutation);
+    });
+
+    it('signs the call end like the node without a revision read', () => {
+      const end = vector('call_end');
+      const payload = end.payload as Payload;
+
+      stubOperationId(end.mutation);
+
+      expect(
+        departing.endOnPageDeparture(
+          sessionOf(creator),
+          payload.callId as string,
+          payload.at as number,
+        ),
+      ).toEqual(end.mutation);
+    });
+  });
 });

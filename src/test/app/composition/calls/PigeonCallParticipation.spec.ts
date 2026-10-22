@@ -31,9 +31,9 @@ describe(PigeonCallParticipation.name, () => {
 
       await participation.leaveOnPageDeparture(session, 'call-a', declined);
 
-      expect(api.leave).toHaveBeenCalledTimes(1);
+      expect(api.leaveOnPageDeparture).toHaveBeenCalledTimes(1);
       const [calledSession, callId, at, calledDeclined] =
-        api.leave.mock.calls[0]!;
+        api.leaveOnPageDeparture.mock.calls[0]!;
 
       expect(calledSession).toBe(session);
       expect(callId).toBe('call-a');
@@ -41,4 +41,19 @@ describe(PigeonCallParticipation.name, () => {
       expect(calledDeclined).toBe(declined);
     },
   );
+
+  it('ends on page departure without reading the call first', async () => {
+    const { api, participation } = build();
+    const before = Date.now();
+
+    await participation.endOnPageDeparture(session, 'call-a');
+
+    expect(api.endOnPageDeparture).toHaveBeenCalledTimes(1);
+    const [calledSession, callId, at] = api.endOnPageDeparture.mock.calls[0]!;
+
+    expect(calledSession).toBe(session);
+    expect(callId).toBe('call-a');
+    expect(at).toBeGreaterThanOrEqual(before);
+    expect(api.get).not.toHaveBeenCalled();
+  });
 });

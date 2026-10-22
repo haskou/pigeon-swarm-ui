@@ -28,6 +28,35 @@ export class PublicMutationSigner {
     return PublicMutationSignature.newOperationId();
   }
 
+  private signAt(
+    session: Session,
+    intent: PublicMutationIntent,
+    position: PublicMutationPosition,
+    authorizationRevision: number,
+  ): PublicMutation {
+    const device = session.deviceCredentialKeyPair.toPrimitives();
+
+    return PublicMutationSignature.sign(
+      {
+        author: {
+          authorizationRevision,
+          deviceCredential: IdentityId.normalize(device.publicKey),
+          identityId: this.authorOf(session),
+        },
+        ...(intent.frontier?.length ? { frontier: intent.frontier } : {}),
+        kind: intent.kind,
+        operationId: this.operationId(),
+        payloadDigest: PublicMutationSignature.payloadDigest(intent.payload),
+        predecessor: position.predecessor,
+        recordId: intent.recordId,
+        sequence: position.sequence,
+        store: intent.store,
+        version: 2,
+      },
+      new PrivateKey(device.privateKey),
+    );
+  }
+
   /** base64url sha256 of the canonical JSON of a value. */
   public digestOfValue(value: unknown): string {
     return PublicMutationSignature.payloadDigest(value);
@@ -48,26 +77,28 @@ export class PublicMutationSigner {
     intent: PublicMutationIntent,
     position: PublicMutationPosition,
   ): Promise<PublicMutation> {
-    const device = session.deviceCredentialKeyPair.toPrimitives();
+    return this.signAt(
+      session,
+      intent,
+      position,
+      await this.revisions.current(session),
+    );
+  }
 
-    return PublicMutationSignature.sign(
-      {
-        author: {
-          authorizationRevision: await this.revisions.current(session),
-          deviceCredential: IdentityId.normalize(device.publicKey),
-          identityId: this.authorOf(session),
-        },
-        ...(intent.frontier?.length ? { frontier: intent.frontier } : {}),
-        kind: intent.kind,
-        operationId: this.operationId(),
-        payloadDigest: PublicMutationSignature.payloadDigest(intent.payload),
-        predecessor: position.predecessor,
-        recordId: intent.recordId,
-        sequence: position.sequence,
-        store: intent.store,
-        version: 2,
-      },
-      new PrivateKey(device.privateKey),
+  /**
+   * Signs without any request, at the revision this device last observed:
+   * for a page being torn down, which cancels every request it starts.
+   */
+  public signAtObservedRevision(
+    session: Session,
+    intent: PublicMutationIntent,
+    position: PublicMutationPosition,
+  ): PublicMutation {
+    return this.signAt(
+      session,
+      intent,
+      position,
+      this.revisions.observed(session),
     );
   }
 }
