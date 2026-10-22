@@ -23,6 +23,12 @@ import { loadCommunityList } from './loadCommunityList';
 
 type CommunitiesState = {
   communities: Community[];
+  /**
+   * Set while the node keeps answering an empty list for an identity this
+   * device listed communities for: forgets that this device saw any and reads
+   * the list again, which then settles an empty list.
+   */
+  continueWithoutCommunities: (() => Promise<void>) | null;
   error: Error | null;
   loading: boolean;
   reload: () => Promise<void>;
@@ -41,6 +47,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [notSettled, setNotSettled] = useState(false);
   const [loadedIdentityId, setLoadedIdentityId] = useState<string | null>(null);
 
   const sessionIdentityId = session?.identity.id ?? null;
@@ -105,6 +112,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
     }
 
     setError(null);
+    setNotSettled(false);
 
     let applicationContainer: Awaited<
       ReturnType<typeof loadApplicationContainer>
@@ -126,7 +134,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
       return;
     }
 
-    await loadCommunityList({
+    await loadCommunityList<Community>({
       load,
       onFailed: (caught) => {
         if (!cached) {
@@ -145,9 +153,26 @@ export function useCommunities(session?: null | Session): CommunitiesState {
         setLoadedIdentityId(identityId);
         setLoading(false);
       },
-      read: async () => await applicationContainer.communities.list(session),
+      onUnsettled: () => {
+        if (!cached) {
+          setError(new Error(copy.communities.notSettled));
+          setNotSettled(true);
+        }
+
+        setLoadedIdentityId(identityId);
+        setLoading(false);
+      },
+      read: async (signal) =>
+        await applicationContainer.communities.list(session, { signal }),
     });
   }, [rememberCommunities, session]);
+
+  const continueWithoutCommunities = useCallback(async () => {
+    if (!sessionIdentityId) return;
+
+    forgetCommunitiesSeen(sessionIdentityId);
+    await reload();
+  }, [reload, sessionIdentityId]);
 
   useEffect(() => {
     void reload();
@@ -159,6 +184,7 @@ export function useCommunities(session?: null | Session): CommunitiesState {
 
   return {
     communities,
+    continueWithoutCommunities: notSettled ? continueWithoutCommunities : null,
     error,
     loading:
       loading ||

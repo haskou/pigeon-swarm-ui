@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import {
   DeviceCredentialCommitment,
   IdentitySignature,
@@ -10,9 +11,10 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
+import type { DeviceIdentityProtector } from '../../../../../contexts/identities/infrastructure/crypto/DeviceIdentityProtector';
+import type { CreatedIdentityMaterial } from '../../../../../contexts/identities/infrastructure/http/CreatedIdentityMaterial';
 import type { IdentityResource } from '../../../../../contexts/identities/infrastructure/http/resources/IdentityResource';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
-import type { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
 
@@ -30,6 +32,8 @@ import { IdentityRegistrationCode } from '../../../../../contexts/identities/dom
 import { IdentitySignaturePayloadFactory } from '../../../../../contexts/identities/infrastructure/http/IdentitySignaturePayloadFactory';
 import { PigeonIdentityCommandsApi } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityCommandsApi';
 import { PigeonIdentityGateway } from '../../../../../contexts/identities/infrastructure/http/PigeonIdentityGateway';
+import { DeviceIdentityVault } from '../../../../../contexts/identities/infrastructure/storage/DeviceIdentityVault';
+import { IndexedDbDeviceIdentityVaultStore } from '../../../../../contexts/identities/infrastructure/storage/IndexedDbDeviceIdentityVaultStore';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 function identity(overrides: Partial<IdentityResource> = {}): IdentityResource {
@@ -63,6 +67,40 @@ function expectIdentitySigned(http: HttpJsonClient, keyPair: KeyPair): void {
   ).not.toThrow();
 }
 
+async function createIdentityThrough(
+  commands: PigeonIdentityCommandsApi,
+  code: IdentityRegistrationCode | null = null,
+  identityKeyPair?: KeyPair,
+): Promise<CreatedIdentityMaterial> {
+  const keyPair = identityKeyPair ?? (await KeyPair.generate());
+
+  return await commands.createIdentity(
+    Identity.create(
+      IdentityId.fromString(keyPair.toPrimitives().publicKey),
+      IdentityProfile.fromPrimitives({
+        banner: undefined,
+        biography: undefined,
+        handle: undefined,
+        name: 'Ada',
+        picture: undefined,
+      }),
+      IdentityNetworkMemberships.fromPrimitives(['network-1']),
+      new Timestamp(100),
+    ),
+    {
+      deviceCredentialKeyPair: await KeyPair.generate(),
+      keyPair,
+      masterKey: SymmetricKey.generate(),
+      recoveryAuthorityKeyPair: await KeyPair.generate(),
+    },
+    IdentityMasterKeyProtection.fromPrimitives({
+      password: 'Correct-Horse-Battery-9!',
+      recoveryKey: RecoveryKey.generate().valueOf(),
+    }),
+    code,
+  );
+}
+
 describe(PigeonIdentityCommandsApi.name, () => {
   it('creates and signs identity material through the identity boundary', async () => {
     const createdIdentity = identity();
@@ -73,7 +111,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
     } as unknown as RequestSigner;
     const vault = {
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
       register: jest.fn().mockImplementation(({ material }) =>
         Promise.resolve({
           authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
@@ -83,6 +121,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
           secretHandle: DeviceUnlockSecretHandle.generate(),
         }),
       ),
+      transitionFirstKeychainPublish: jest.fn().mockResolvedValue(true),
     } as unknown as DeviceIdentityVault;
     const commands = new PigeonIdentityCommandsApi(
       http,
@@ -92,13 +131,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
       vault,
     );
 
-    const created = await commands.create(
-      'Ada',
-      'password',
-      ['network-1'],
-      '@ada',
-      { recoveryKey: RecoveryKey.generate().valueOf() },
-    );
+    const created = await createIdentityThrough(commands);
 
     expect(created).toMatchObject({
       authorizationEpoch: expect.any(Object),
@@ -113,7 +146,7 @@ describe(PigeonIdentityCommandsApi.name, () => {
     expectIdentitySigned(http, created.keyPair);
 
     expect(vault.register).toHaveBeenCalledWith(
-      expect.objectContaining({ firstKeychainPublish: 'armed' }),
+      expect.objectContaining({ firstKeychainPublish: 'unacknowledged' }),
     );
 
     expect(http.request).toHaveBeenCalledWith(
@@ -200,7 +233,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
 
   function vault(): DeviceIdentityVault {
     return {
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
       register: jest.fn().mockImplementation(({ material }) =>
         Promise.resolve({
           authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
@@ -210,6 +243,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
           secretHandle: DeviceUnlockSecretHandle.generate(),
         }),
       ),
+      transitionFirstKeychainPublish: jest.fn().mockResolvedValue(true),
     } as unknown as DeviceIdentityVault;
   }
 
@@ -262,9 +296,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const progress = jest.fn();
     const stop = commands.watchAdmissionProgress(progress);
 
-    await commands.create('Ada', 'password', ['network-1'], undefined, {
-      recoveryKey: RecoveryKey.generate().valueOf(),
-    });
+    await createIdentityThrough(commands);
     stop();
 
     const retried = sentBody(http, 1);
@@ -340,13 +372,7 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
     const deviceVault = vault();
 
     await expect(
-      commandsWith(http, undefined, deviceVault).create(
-        'Ada',
-        'password',
-        ['network-1'],
-        undefined,
-        { recoveryKey: RecoveryKey.generate().valueOf() },
-      ),
+      createIdentityThrough(commandsWith(http, undefined, deviceVault)),
     ).rejects.toBe(refusal);
     expect(http.request).toHaveBeenCalledTimes(3);
     expect(deviceVault.delete).toHaveBeenCalledTimes(1);
@@ -361,11 +387,9 @@ describe(`${PigeonIdentityCommandsApi.name} admission difficulty`, () => {
 
     mine.mockResolvedValue('1');
 
-    await expect(
-      commandsWith(http).create('Ada', 'password', ['network-1'], undefined, {
-        recoveryKey: RecoveryKey.generate().valueOf(),
-      }),
-    ).rejects.toBe(refusal);
+    await expect(createIdentityThrough(commandsWith(http))).rejects.toBe(
+      refusal,
+    );
     expect(http.request).toHaveBeenCalledTimes(1);
     expect(mine).toHaveBeenCalledTimes(1);
   });
@@ -378,48 +402,26 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     http: HttpJsonClient,
     deviceVault: DeviceIdentityVault,
     code: IdentityRegistrationCode | null,
+    identityKeyPair?: KeyPair,
   ): Promise<unknown> {
-    const keyPair = await KeyPair.generate();
-    const commands = new PigeonIdentityCommandsApi(
-      http,
-      {
-        headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
-      } as unknown as RequestSigner,
-      new PigeonIdentityGateway(http),
-      new IdentitySignaturePayloadFactory(),
-      deviceVault,
-    );
-
-    return await commands.createIdentity(
-      Identity.create(
-        IdentityId.fromString(keyPair.toPrimitives().publicKey),
-        IdentityProfile.fromPrimitives({
-          banner: undefined,
-          biography: undefined,
-          handle: undefined,
-          name: 'Ada',
-          picture: undefined,
-        }),
-        IdentityNetworkMemberships.fromPrimitives(['network-1']),
-        new Timestamp(100),
+    return await createIdentityThrough(
+      new PigeonIdentityCommandsApi(
+        http,
+        {
+          headers: jest.fn().mockResolvedValue({ 'X-Signature': 'signed' }),
+        } as unknown as RequestSigner,
+        new PigeonIdentityGateway(http),
+        new IdentitySignaturePayloadFactory(),
+        deviceVault,
       ),
-      {
-        deviceCredentialKeyPair: await KeyPair.generate(),
-        keyPair,
-        masterKey: SymmetricKey.generate(),
-        recoveryAuthorityKeyPair: await KeyPair.generate(),
-      },
-      IdentityMasterKeyProtection.fromPrimitives({
-        password: 'Correct-Horse-Battery-9!',
-        recoveryKey: RecoveryKey.generate().valueOf(),
-      }),
       code,
+      identityKeyPair,
     );
   }
 
   function vault(): DeviceIdentityVault {
     return {
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
       register: jest.fn().mockImplementation(({ material }) =>
         Promise.resolve({
           authorizationEpoch: DeviceAuthorizationEpoch.genesis(),
@@ -429,6 +431,7 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
           secretHandle: DeviceUnlockSecretHandle.generate(),
         }),
       ),
+      transitionFirstKeychainPublish: jest.fn().mockResolvedValue(true),
     } as unknown as DeviceIdentityVault;
   }
 
@@ -464,17 +467,86 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
     });
   });
 
-  it('marks the identity created on this device as awaiting its first keychain publish', async () => {
+  it('marks the identity created on this device unacknowledged until the node accepts it, then armed', async () => {
     const http = {
       request: jest.fn().mockResolvedValue(identity()),
     } as unknown as HttpJsonClient;
     const deviceVault = vault();
+    const keyPair = await KeyPair.generate();
+    const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
 
-    await created(http, deviceVault, null);
+    await created(http, deviceVault, null, keyPair);
 
     expect(deviceVault.register).toHaveBeenCalledWith(
-      expect.objectContaining({ firstKeychainPublish: 'armed' }),
+      expect.objectContaining({ firstKeychainPublish: 'unacknowledged' }),
     );
+    expect(deviceVault.transitionFirstKeychainPublish).toHaveBeenCalledWith(
+      identityId,
+      'unacknowledged',
+      'armed',
+    );
+    expect(jest.mocked(http.request).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(deviceVault.transitionFirstKeychainPublish).mock
+        .invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('keeps the local identity when the accepted identity cannot be marked armed', async () => {
+    const http = {
+      request: jest.fn().mockResolvedValue(identity()),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+    jest
+      .mocked(deviceVault.transitionFirstKeychainPublish)
+      .mockResolvedValueOnce(false);
+
+    await expect(created(http, deviceVault, null)).rejects.toThrow();
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(deviceVault.delete).not.toHaveBeenCalled();
+  });
+
+  it('refuses a retry once the node accepted the identity: no second post, and the local identity is kept', async () => {
+    const keyPair = await KeyPair.generate();
+    const identityId = IdentityId.fromString(keyPair.toPrimitives().publicKey);
+    const store = new IndexedDbDeviceIdentityVaultStore();
+    const deviceVault = new DeviceIdentityVault(store, {
+      protect: jest
+        .fn()
+        .mockImplementation(
+          ({
+            deviceId,
+            secretHandle,
+          }: {
+            deviceId: DeviceId;
+            secretHandle: DeviceUnlockSecretHandle;
+          }) =>
+            Promise.resolve({
+              deviceId,
+              encryptedMaterial: { valueOf: () => 'encrypted-material' },
+              envelope: { serialize: () => 'envelope' },
+              factorKey: {} as CryptoKey,
+              identityId,
+              secretHandle,
+            }),
+        ),
+    } as unknown as DeviceIdentityProtector);
+    const forget = jest.spyOn(deviceVault, 'delete');
+    const http = {
+      request: jest.fn().mockResolvedValue(identity()),
+    } as unknown as HttpJsonClient;
+
+    await created(http, deviceVault, null, keyPair);
+    // A later sign-up step (opening the session) failed, so the user retries
+    // Create with the same recovery key, hence the same identity.
+    await expect(created(http, deviceVault, null, keyPair)).rejects.toThrow(
+      'Vault record already exists.',
+    );
+
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(forget).not.toHaveBeenCalled();
+    await expect(store.find(identityId)).resolves.toMatchObject({
+      firstKeychainPublish: 'armed',
+    });
   });
 
   it('posts nothing and keeps the local identity when the vault already holds it', async () => {
@@ -503,6 +575,30 @@ describe(`${PigeonIdentityCommandsApi.name} registration codes`, () => {
       request: jest.fn().mockRejectedValue(refusal),
     } as unknown as HttpJsonClient;
     const deviceVault = vault();
+
+    await expect(
+      created(
+        http,
+        deviceVault,
+        IdentityRegistrationCode.fromString(registrationCode),
+      ),
+    ).rejects.toBe(refusal);
+    expect(deviceVault.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the node refusal, not the cleanup failure, when forgetting the local identity fails', async () => {
+    const refusal = new HttpJsonError(
+      403,
+      'Forbidden',
+      JSON.stringify({ code: 403011, httpStatus: 403 }),
+    );
+    const http = {
+      request: jest.fn().mockRejectedValue(refusal),
+    } as unknown as HttpJsonClient;
+    const deviceVault = vault();
+    jest
+      .mocked(deviceVault.delete)
+      .mockRejectedValueOnce(new Error('Vault delete failed.'));
 
     await expect(
       created(

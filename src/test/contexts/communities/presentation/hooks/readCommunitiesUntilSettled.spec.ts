@@ -1,5 +1,6 @@
 import { CommunityListNotSettledError } from '../../../../../contexts/communities/presentation/hooks/CommunityListNotSettledError';
 import { readCommunitiesUntilSettled } from '../../../../../contexts/communities/presentation/hooks/readCommunitiesUntilSettled';
+import { HttpConnectionError } from '../../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const community = { id: 'community-1' } as never;
@@ -79,6 +80,43 @@ describe('readCommunitiesUntilSettled', () => {
     await expect(
       readCommunitiesUntilSettled({ delaysMs, hadCommunities: false, read }),
     ).rejects.toBeInstanceOf(HttpJsonError);
+  });
+
+  it('keeps reading past a node that refuses connections or whose proxy answers 502/503 while it starts', async () => {
+    const read = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new HttpConnectionError(new TypeError('Failed to fetch')),
+      )
+      .mockRejectedValueOnce(new HttpJsonError(502, 'Bad Gateway', ''))
+      .mockRejectedValueOnce(new HttpJsonError(503, 'Service Unavailable', ''))
+      .mockResolvedValueOnce([community]);
+
+    await expect(
+      readCommunitiesUntilSettled({
+        delaysMs: [1, 1, 1],
+        hadCommunities: true,
+        read,
+      }),
+    ).resolves.toEqual([community]);
+    expect(read).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not keep reading past a coded 503 other than 503020', async () => {
+    const read = jest
+      .fn()
+      .mockRejectedValue(
+        new HttpJsonError(
+          503,
+          'Service Unavailable',
+          JSON.stringify({ code: 503010 }),
+        ),
+      );
+
+    await expect(
+      readCommunitiesUntilSettled({ delaysMs, hadCommunities: true, read }),
+    ).rejects.toMatchObject({ code: 503010 });
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry other failures', async () => {

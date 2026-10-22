@@ -5,6 +5,7 @@ import type { RequestCache } from '../../../../shared/infrastructure/http/Reques
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { ReplicatedStateReadOptions } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import type { KeychainCipher, KeychainHead } from '../crypto/KeychainCipher';
+import type { PublishedKeychainPayload } from '../crypto/PublishedKeychainPayload';
 import type {
   LocalKeychain,
   LocalKeychainUpdate,
@@ -21,6 +22,14 @@ import { KeychainHeadUnavailableError } from './errors/KeychainHeadUnavailableEr
 import { KeychainNotFoundError } from './errors/KeychainNotFoundError';
 
 const remoteKeychainCacheTtlMs = 1500;
+const keychainsPath = '/keychains';
+
+// A keychain post sealed and signed locally, not yet sent.
+type PreparedKeychainPost = {
+  body: PublishedKeychainPayload;
+  headers: Record<string, string>;
+  keychain: LocalKeychain;
+};
 
 function keychainPath(session: Session): string {
   return `/keychains/${encodeURIComponent(session.identity.id)}`;
@@ -134,21 +143,50 @@ export class PigeonKeychainApi {
     head: KeychainHead | undefined,
     keychain: LocalKeychain,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    const path = '/keychains';
+    return await this.sendKeychainPost(
+      session,
+      await this.prepareKeychainPost(session, head, keychain),
+    );
+  }
+
+  // Seals and signs the post locally; nothing reaches the node, so a throw
+  // here proves nothing was sent.
+  private async prepareKeychainPost(
+    session: Session,
+    head: KeychainHead | undefined,
+    keychain: LocalKeychain,
+  ): Promise<PreparedKeychainPost> {
     const encrypted = this.cipher.encryptForPublish(session, head, keychain);
+
+    return {
+      body: encrypted.body,
+      headers: await this.signer.headers(
+        session,
+        'POST',
+        keychainsPath,
+        encrypted.body,
+      ),
+      keychain: encrypted.keychain,
+    };
+  }
+
+  private async sendKeychainPost(
+    session: Session,
+    prepared: PreparedKeychainPost,
+  ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
     const published = await this.http.request<{
       keychainExternalIdentifier: string;
       ownerIdentityId: string;
       version: number;
-    }>(path, {
-      body: JSON.stringify(encrypted.body),
-      headers: await this.signer.headers(session, 'POST', path, encrypted.body),
+    }>(keychainsPath, {
+      body: JSON.stringify(prepared.body),
+      headers: prepared.headers,
       method: 'POST',
     });
     this.requestCache.invalidateForSession(keychainPath(session), session);
 
     return {
-      keychain: encrypted.keychain,
+      keychain: prepared.keychain,
       keychainExternalIdentifier: published.keychainExternalIdentifier,
     };
   }
@@ -179,11 +217,14 @@ export class PigeonKeychainApi {
 
   /**
    * Posts an identity's first keychain without a head, the only pointer-less
-   * publish allowed, and only from `armed`. The marker moves to `ambiguous`
-   * before the POST, so a post that loses its answer is never repeated
-   * head-less. A definitive 4xx refusal commits nothing and returns the marker
-   * to `armed`. `ambiguous` never posts; it clears only when a head is adopted.
-   * `none` never posts.
+   * publish allowed, and only from `armed`. The post is sealed and signed
+   * first, so a local failure leaves the marker `armed`. The marker then moves
+   * `armed` -> `ambiguous` atomically before the POST, so a post that loses
+   * its answer is never repeated head-less and two tabs never both post. A
+   * definitive 4xx refusal commits nothing and returns the marker to `armed`
+   * unless another tab moved it meanwhile. `ambiguous` never posts; it clears
+   * only when a head is adopted. `none` and `unacknowledged`, an identity the
+   * node has not yet accepted, never post.
    */
   private async publishFirstKeychain(
     session: Session,
@@ -191,7 +232,7 @@ export class PigeonKeychainApi {
     state: FirstKeychainPublishState,
     update: LocalKeychainUpdate,
   ): Promise<{ keychain: LocalKeychain; keychainExternalIdentifier: string }> {
-    if (state === 'none') {
+    if (state === 'none' || state === 'unacknowledged') {
       throw new KeychainNotFoundError();
     }
 
@@ -199,10 +240,23 @@ export class PigeonKeychainApi {
       throw new KeychainHeadUnavailableError('ambiguous');
     }
 
-    const keychain = update(session.keychain);
+    const prepared = await this.prepareKeychainPost(
+      session,
+      undefined,
+      update(session.keychain),
+    );
 
-    // Written before the POST, so a failed write sends nothing.
-    await this.vault.setFirstKeychainPublish(identityId, 'ambiguous');
+    // Written before the POST, so a failed write sends nothing. A marker no
+    // longer armed means another tab started this first publish.
+    if (
+      !(await this.vault.transitionFirstKeychainPublish(
+        identityId,
+        'armed',
+        'ambiguous',
+      ))
+    ) {
+      throw new KeychainHeadUnavailableError('ambiguous');
+    }
 
     let published: {
       keychain: LocalKeychain;
@@ -210,29 +264,39 @@ export class PigeonKeychainApi {
     };
 
     try {
-      published = await this.postKeychain(session, undefined, keychain);
+      published = await this.sendKeychainPost(session, prepared);
     } catch (caught: unknown) {
-      // A definitive 4xx refusal commits nothing, so the first publish is
-      // armed again. Any other failure may have committed and stays ambiguous.
-      // The node returns 4xx from POST /keychains only before commit
-      // (pigeon-swarm-node origin/main 31fc9d20: PostKeychainRoute.ts:22-50,
-      // KeychainPublisher.ts:46-71, commit at line 71). Keep in step with it.
-      const refused =
-        caught instanceof HttpJsonError &&
-        caught.status >= 400 &&
-        caught.status < 500 &&
-        caught.status !== 408;
-
-      if (refused) {
-        await this.vault.setFirstKeychainPublish(identityId, 'armed');
-      }
-
+      await this.rearmAfterRefusal(identityId, caught);
       throw caught;
     }
 
-    await this.vault.setFirstKeychainPublish(identityId, 'none');
+    await this.vault.clearFirstKeychainPublish(identityId);
 
     return published;
+  }
+
+  // A definitive 4xx refusal commits nothing, so the first publish is armed
+  // again, unless another tab moved the marker meanwhile. Any other failure
+  // may have committed and stays ambiguous. The node returns 4xx from
+  // POST /keychains only before commit (pigeon-swarm-node origin/main
+  // 31fc9d20: PostKeychainRoute.ts:22-50, KeychainPublisher.ts:46-71, commit
+  // at line 71). Keep in step with it.
+  private async rearmAfterRefusal(
+    identityId: IdentityId,
+    caught: unknown,
+  ): Promise<void> {
+    if (
+      caught instanceof HttpJsonError &&
+      caught.status >= 400 &&
+      caught.status < 500 &&
+      caught.status !== 408
+    ) {
+      await this.vault.transitionFirstKeychainPublish(
+        identityId,
+        'ambiguous',
+        'armed',
+      );
+    }
   }
 
   public decrypt(session: Session, keychain: KeychainResource): LocalKeychain {
@@ -308,7 +372,7 @@ export class PigeonKeychainApi {
       // A head proves the first keychain exists, so a pending or ambiguous
       // first publish is over. Clearing it adopts this head.
       if (state !== 'none') {
-        await this.vault.setFirstKeychainPublish(identityId, 'none');
+        await this.vault.clearFirstKeychainPublish(identityId);
       }
 
       return await this.postKeychain(session, head, keychain);

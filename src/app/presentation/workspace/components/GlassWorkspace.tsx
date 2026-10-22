@@ -100,6 +100,7 @@ interface GlassWorkspaceProps {
   nodeNetworksLoading: boolean;
   nodeNetworksLoadError: boolean;
   onCommunitiesReload: () => Promise<void>;
+  onContinueWithoutCommunities: (() => Promise<void>) | null;
   onNodeNetworksReload: () => Promise<void>;
   onPeersReload: () => Promise<void>;
   onPendingCommunityInviteHandled?: () => void;
@@ -120,6 +121,7 @@ export function GlassWorkspace({
   nodeNetworksLoadError,
   nodeNetworksLoading,
   onCommunitiesReload,
+  onContinueWithoutCommunities,
   onNodeNetworksReload,
   onPeersReload,
   onPendingCommunityInviteHandled,
@@ -1188,6 +1190,7 @@ export function GlassWorkspace({
             }
             onChannelViewed={clearCommunityChannelUnread}
             onCommunitiesRetry={onCommunitiesReload}
+            onContinueWithoutCommunities={onContinueWithoutCommunities}
             onCommunityChannelsUpdated={updateCommunityChannels}
             onCommunityLeft={removeCommunity}
             onCommunityUpdated={updateCommunity}

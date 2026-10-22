@@ -170,8 +170,8 @@ export class DeviceIdentityVault {
 
   /**
    * The first-publish state of an identity created on this device. Only an
-   * `armed` state lets its first keychain post without a head. An identity
-   * with no local record has none.
+   * `armed` state, set once the node accepted the identity, lets its first
+   * keychain post without a head. An identity with no local record has none.
    */
   public async firstKeychainPublishState(
     identityId: IdentityId,
@@ -181,17 +181,33 @@ export class DeviceIdentityVault {
     return record?.firstKeychainPublish ?? 'none';
   }
 
-  public async setFirstKeychainPublish(
+  /** Clears the marker: the first keychain is on the node, or never may be. */
+  public async clearFirstKeychainPublish(
     identityId: IdentityId,
-    state: FirstKeychainPublishState,
   ): Promise<void> {
-    await this.store.setFirstKeychainPublish(identityId, state);
+    await this.store.clearFirstKeychainPublish(identityId);
+  }
+
+  /**
+   * Moves the marker from `from` to `to` atomically and answers whether it
+   * moved. A false answer means another tab changed it first.
+   */
+  public async transitionFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    return await this.store.transitionFirstKeychainPublish(
+      identityId,
+      from,
+      to,
+    );
   }
 
   public async register(input: {
     authorizationEpoch?: DeviceAuthorizationEpoch;
     authorizationRevision?: DeviceAuthorizationRevision;
-    firstKeychainPublish?: 'armed';
+    firstKeychainPublish?: 'unacknowledged';
     identityId: IdentityId;
     material: DeviceIdentityKeyMaterial;
     password: string;
@@ -222,11 +238,13 @@ export class DeviceIdentityVault {
       firstKeychainPublish: input.firstKeychainPublish,
     };
 
-    // A first publish arms a new record only; an existing record is refused
-    // rather than re-armed. Other registrations overwrite the record and keep
+    // Creating an identity records it `unacknowledged` until the node accepts
+    // its genesis. It may replace only a record the node never acknowledged,
+    // so a retry cannot post a second genesis for a live identity; any other
+    // record is refused. Other registrations overwrite the record and keep
     // the marker it already holds.
-    if (input.firstKeychainPublish === 'armed') {
-      await this.store.insert(record);
+    if (input.firstKeychainPublish === 'unacknowledged') {
+      await this.store.arm(record);
     } else {
       await this.store.save(record);
     }

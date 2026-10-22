@@ -397,6 +397,7 @@ export const en = {
     confirmDeleteChannel: 'Confirm delete',
     confirmDeleteRole: 'Confirm delete',
     confirmKickMember: 'Confirm kick',
+    continueWithoutCommunities: 'Continue without communities',
     create: 'Create community',
     createBody:
       'Create a community inside one of your networks. You can define its visibility, initial channels and join permissions.',
@@ -574,6 +575,8 @@ export const en = {
     noModerationLogs: 'No moderation logs yet.',
     noPrivateNetwork:
       'No private network is available. Private communities can only be created inside a private network.',
+    notSettled:
+      'This device listed communities for you, but the node still lists none. They may have been left or deleted on another device, or the node may still be opening them.',
     openAvatar: 'Open community avatar',
     openBanner: 'Open community banner',
     owner: 'Owner',
@@ -842,6 +845,8 @@ export const en = {
     backend: {
       400070:
         'The node refused that registration code. Allow 1 to 100 uses and pick an expiry in the future within the node’s limit.',
+      400080:
+        'That identity id is not in the form nodes accept. Paste the id copied from its owner, or an @handle.',
       401020: 'The signed request was rejected. Please reload and try again.',
       401021:
         'The request was missing authentication headers. Please reload and try again.',
@@ -1146,6 +1151,8 @@ export const en = {
       'invalid-document': 'The list is not valid',
       'invalid-signature':
         'The signature is missing or invalid, or the owner changed key',
+      'non-canonical-identity-id':
+        'The list names an identity id that nodes do not accept. Ask its owner to fix it.',
       'not-newer': 'No newer version',
       redirected: 'The address redirects elsewhere',
       'refused-address': 'The address is not allowed',

@@ -403,6 +403,7 @@ export const es = {
     confirmDeleteChannel: 'Confirmar borrado',
     confirmDeleteRole: 'Confirmar borrado',
     confirmKickMember: 'Confirmar expulsión',
+    continueWithoutCommunities: 'Continuar sin comunidades',
     create: 'Crear comunidad',
     createBody:
       'Crea una comunidad dentro de una de tus redes. Puedes definir su visibilidad, canales iniciales y permisos de unión.',
@@ -581,6 +582,8 @@ export const es = {
     noModerationLogs: 'Aún no hay registros de moderación.',
     noPrivateNetwork:
       'No hay una red privada disponible. Las comunidades privadas solo se pueden crear dentro de una red privada.',
+    notSettled:
+      'Este dispositivo mostró comunidades tuyas, pero el nodo todavía no muestra ninguna. Puede que se abandonaran o borraran en otro dispositivo, o que el nodo aún las esté abriendo.',
     openAvatar: 'Abrir avatar de comunidad',
     openBanner: 'Abrir banner de comunidad',
     owner: 'Propietario',
@@ -851,6 +854,8 @@ export const es = {
     backend: {
       400070:
         'El nodo rechazó ese código de registro. Permite entre 1 y 100 usos y elige una caducidad futura dentro del límite del nodo.',
+      400080:
+        'Ese id de identidad no tiene la forma que aceptan los nodos. Pega el id que copió su propietario, o un @handle.',
       401020:
         'La solicitud firmada fue rechazada. Recarga e inténtalo de nuevo.',
       401021:
@@ -1152,6 +1157,8 @@ export const es = {
       'invalid-document': 'La lista no es válida',
       'invalid-signature':
         'Falta la firma o no es válida, o el propietario cambió de clave',
+      'non-canonical-identity-id':
+        'La lista indica un id de identidad que los nodos no aceptan. Pide a su propietario que lo corrija.',
       'not-newer': 'No hay una versión más nueva',
       redirected: 'La dirección redirige a otro sitio',
       'refused-address': 'La dirección no está permitida',

@@ -38,6 +38,15 @@ describe('PigeonCommunitiesFacade', () => {
     );
   });
 
+  it('lists the communities of the session with the abort signal of the read', async () => {
+    const { signal } = new AbortController();
+
+    management.search.mockResolvedValue([]);
+
+    await expect(facade.list(session, { signal })).resolves.toEqual([]);
+    expect(management.search).toHaveBeenCalledWith(session, { signal });
+  });
+
   describe('updateChannelPermissions', () => {
     it('opens the channel group once the restriction is signed', async () => {
       visibility('private');

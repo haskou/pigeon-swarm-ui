@@ -1,5 +1,7 @@
+import { HttpConnectionError } from '../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonError } from '../../../../shared/infrastructure/http/HttpJsonError';
 import {
+  isNodeStarting,
   replicatedStateNotReadyCodes,
   replicatedStateRetryDelaysMs,
   retryReplicatedStateRead,
@@ -128,6 +130,54 @@ describe(retryReplicatedStateRead.name, () => {
       HttpJsonError,
     );
     expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it('also reads again on a failure the caller marks as retriable', async () => {
+    const refused = new HttpConnectionError(new TypeError('Failed to fetch'));
+    const read = jest
+      .fn()
+      .mockRejectedValueOnce(refused)
+      .mockRejectedValueOnce(notReadyError())
+      .mockResolvedValueOnce('value');
+    const isRetriable = jest.fn(
+      (caught: unknown) => caught instanceof HttpConnectionError,
+    );
+    const pending = retryReplicatedStateRead(read, { isRetriable });
+
+    await jest.runAllTimersAsync();
+
+    await expect(pending).resolves.toBe('value');
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(isRetriable).toHaveBeenCalledWith(refused);
+  });
+
+  describe(isNodeStarting.name, () => {
+    it.each([
+      [
+        'a refused connection',
+        new HttpConnectionError(new TypeError('Failed to fetch')),
+      ],
+      ['a proxy 502', new HttpJsonError(502, 'Bad Gateway', '')],
+      ['an uncoded 503', new HttpJsonError(503, 'Service Unavailable', '')],
+      ['a proxy 504', new HttpJsonError(504, 'Gateway Timeout', '')],
+    ])('marks %s as a node that is starting', (_label, caught) => {
+      expect(isNodeStarting(caught)).toBe(true);
+    });
+
+    it.each([
+      [
+        'a coded 503 other than 503020',
+        new HttpJsonError(503, 'Unavailable', JSON.stringify({ code: 503010 })),
+      ],
+      ['a 500', new HttpJsonError(500, 'Server Error', '')],
+      ['another error', new Error('offline')],
+      [
+        'a TypeError thrown before any request was sent',
+        new TypeError('Cannot read properties of undefined'),
+      ],
+    ])('does not mark %s as a node that is starting', (_label, caught) => {
+      expect(isNodeStarting(caught)).toBe(false);
+    });
   });
 
   it('reads again while a value is still pending', async () => {

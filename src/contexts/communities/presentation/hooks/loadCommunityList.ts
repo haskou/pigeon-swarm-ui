@@ -3,6 +3,7 @@ import {
   rememberCommunitiesSeen,
 } from '../../infrastructure/storage/communitiesSeen';
 import { type CommunityListLoad } from './CommunityListLoad';
+import { CommunityListNotSettledError } from './CommunityListNotSettledError';
 import { readCommunitiesUntilSettled } from './readCommunitiesUntilSettled';
 
 type LoadCommunityListOptions<T> = {
@@ -10,6 +11,12 @@ type LoadCommunityListOptions<T> = {
   load: CommunityListLoad;
   onFailed: (caught: unknown) => void;
   onSettled: (communities: T[]) => void;
+  /**
+   * Called instead of `onFailed` when the node kept answering an empty list
+   * for an identity this device listed communities for. Only the user can tell
+   * that they were deleted or left on another device, so the flag is kept.
+   */
+  onUnsettled: () => void;
   onWaiting?: () => void;
   read: (signal: AbortSignal) => Promise<T[]>;
 };
@@ -25,6 +32,7 @@ export async function loadCommunityList<T>({
   load,
   onFailed,
   onSettled,
+  onUnsettled,
   onWaiting,
   read,
 }: LoadCommunityListOptions<T>): Promise<void> {
@@ -43,7 +51,10 @@ export async function loadCommunityList<T>({
       signal: load.signal,
     });
   } catch (caught: unknown) {
-    if (load.isCurrent()) onFailed(caught);
+    if (!load.isCurrent()) return;
+
+    if (caught instanceof CommunityListNotSettledError) onUnsettled();
+    else onFailed(caught);
 
     return;
   }

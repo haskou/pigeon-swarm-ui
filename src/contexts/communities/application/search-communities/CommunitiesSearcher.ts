@@ -8,7 +8,13 @@ export class CommunitiesSearcher {
     private readonly communityRepository: CommunityRepository,
   ) {}
 
-  public async search(message: SearchCommunitiesMessage): Promise<Community[]> {
-    return await this.communityRepository.search(message.getActorIdentityId());
+  public async search(
+    message: SearchCommunitiesMessage,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<Community[]> {
+    return await this.communityRepository.search(
+      message.getActorIdentityId(),
+      options,
+    );
   }
 }

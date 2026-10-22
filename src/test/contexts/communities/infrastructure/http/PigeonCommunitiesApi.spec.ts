@@ -10,6 +10,7 @@ import type { RequestSigner } from '../../../../../shared/infrastructure/http/Re
 
 import { PigeonCommunitiesApi } from '../../../../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { DraftPayloadCipher } from '../../../../../contexts/messages/infrastructure/crypto/DraftPayloadCipher';
+import { HttpConnectionError } from '../../../../../shared/infrastructure/http/HttpConnectionError';
 import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 import { RequestCache } from '../../../../../shared/infrastructure/http/RequestCache';
 import { ScopeFrontierReader } from '../../../../../shared/infrastructure/http/ScopeFrontierReader';
@@ -197,6 +198,88 @@ describe(PigeonCommunitiesApi.name, () => {
 
       await settled;
       expect(request).toHaveBeenCalledTimes(9);
+    });
+
+    it('reads the community list again while the node refuses or its proxy answers 502/503 on startup', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new HttpConnectionError(new TypeError('Failed to fetch')),
+        )
+        .mockRejectedValueOnce(new HttpJsonError(502, 'Bad Gateway', ''))
+        .mockRejectedValueOnce(
+          new HttpJsonError(503, 'Service Unavailable', ''),
+        )
+        .mockResolvedValueOnce({ communities: [{ id: 'community-1' }] });
+      const headers = jest.fn().mockResolvedValue({});
+      const pending = apiFor(request, headers).list(session);
+
+      await jest.runAllTimersAsync();
+
+      await expect(pending).resolves.toEqual([{ id: 'community-1' }]);
+      expect(request).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not read the community list again after a coded 503 other than 503020', async () => {
+      const request = jest
+        .fn()
+        .mockRejectedValue(
+          new HttpJsonError(
+            503,
+            'Service Unavailable',
+            JSON.stringify({ code: 503010 }),
+          ),
+        );
+      const headers = jest.fn().mockResolvedValue({});
+
+      await expect(
+        apiFor(request, headers).list(session),
+      ).rejects.toMatchObject({ code: 503010 });
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops retrying a community list read once its caller aborts', async () => {
+      const request = jest.fn().mockRejectedValue(notReadyError());
+      const headers = jest.fn().mockResolvedValue({});
+      const controller = new AbortController();
+      const pending = apiFor(request, headers).list(session, {
+        signal: controller.signal,
+      });
+      const settled = expect(pending).rejects.toThrow('left');
+
+      await jest.advanceTimersByTimeAsync(0);
+      controller.abort(new Error('left'));
+      await jest.runAllTimersAsync();
+
+      await settled;
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the shared community list read of another caller going when one caller aborts', async () => {
+      const cache = new RequestCache();
+      const request = jest
+        .fn()
+        .mockRejectedValueOnce(notReadyError())
+        .mockResolvedValueOnce({ communities: [{ id: 'community-1' }] });
+      const headers = jest.fn().mockResolvedValue({});
+      const api = new PigeonCommunitiesApi(
+        { request } as unknown as HttpJsonClient,
+        { headers } as unknown as RequestSigner,
+        async (key, loader, options) => await cache.load(key, loader, options),
+        publicMutationSignerAt(),
+      );
+      const controller = new AbortController();
+      const aborted = api.list(session, { signal: controller.signal });
+      const abortedSettled = expect(aborted).rejects.toThrow('left');
+      const kept = api.list(session);
+
+      await jest.advanceTimersByTimeAsync(0);
+      controller.abort(new Error('left'));
+      await jest.runAllTimersAsync();
+
+      await abortedSettled;
+      await expect(kept).resolves.toEqual([{ id: 'community-1' }]);
+      expect(request).toHaveBeenCalledTimes(2);
     });
 
     it('retries a channel message read the node is still opening', async () => {

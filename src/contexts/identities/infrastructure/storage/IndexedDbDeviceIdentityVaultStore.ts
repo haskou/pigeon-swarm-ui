@@ -13,6 +13,12 @@ const DATABASE_NAME = scopeClientStorageKey('pigeon-swarm-device-vault');
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'identities';
 
+// A transaction aborted without a failed request (quota, close, explicit
+// abort) fires no `error` event; without this the write would never settle.
+function aborted(transaction: IDBTransaction): Error {
+  return transaction.error ?? new Error('Vault transaction aborted.');
+}
+
 export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
   private open(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -44,6 +50,65 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         request.addEventListener('error', () => reject(request.error));
         request.addEventListener('success', () => resolve(request.result));
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
+      });
+    } finally {
+      database.close();
+    }
+  }
+
+  // Moves the marker to `to` in one transaction, only while it still holds
+  // `from` (a record without a marker holds none); an undefined `from` writes
+  // unconditionally. Answers whether the marker was written.
+  private async writeFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState | undefined,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    const database = await this.open();
+
+    try {
+      return await new Promise<boolean>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(identityId.valueOf());
+        let written = false;
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const record = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          if (record?.version !== 2) {
+            transaction.abort();
+            reject(
+              new Error(
+                'No version 2 vault record holds the first-publish marker, so it was not set.',
+              ),
+            );
+
+            return;
+          }
+
+          if (from && (record.firstKeychainPublish ?? 'none') !== from) {
+            return;
+          }
+
+          store.put({
+            ...record,
+            firstKeychainPublish: to,
+            updatedAt: Date.now(),
+          } satisfies DeviceIdentityVaultRecord);
+          written = true;
+        });
+        transaction.addEventListener('complete', () => resolve(written));
+        transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -105,6 +170,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
@@ -117,46 +185,18 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
     );
   }
 
-  public async setFirstKeychainPublish(
+  public async clearFirstKeychainPublish(
     identityId: IdentityId,
-    state: FirstKeychainPublishState,
   ): Promise<void> {
-    const database = await this.open();
+    await this.writeFirstKeychainPublish(identityId, undefined, 'none');
+  }
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.get(identityId.valueOf());
-
-        request.addEventListener('error', () => reject(request.error));
-        request.addEventListener('success', () => {
-          const record = request.result as
-            | DeviceIdentityVaultRecord
-            | undefined;
-
-          if (record?.version !== 2) {
-            reject(
-              new Error(
-                'No version 2 vault record holds the first-publish marker, so it was not set.',
-              ),
-            );
-
-            return;
-          }
-
-          store.put({
-            ...record,
-            firstKeychainPublish: state,
-            updatedAt: Date.now(),
-          } satisfies DeviceIdentityVaultRecord);
-        });
-        transaction.addEventListener('complete', () => resolve());
-        transaction.addEventListener('error', () => reject(transaction.error));
-      });
-    } finally {
-      database.close();
-    }
+  public async transitionFirstKeychainPublish(
+    identityId: IdentityId,
+    from: FirstKeychainPublishState,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean> {
+    return await this.writeFirstKeychainPublish(identityId, from, to);
   }
 
   public async find(
@@ -196,14 +236,55 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();
     }
   }
 
-  public async insert(record: DeviceIdentityVaultRecord): Promise<void> {
-    await this.request('readwrite', (store) => store.add(record));
+  public async arm(record: DeviceIdentityVaultRecord): Promise<void> {
+    const database = await this.open();
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(record.identityId);
+
+        request.addEventListener('error', () => reject(request.error));
+        request.addEventListener('success', () => {
+          const existing = request.result as
+            | DeviceIdentityVaultRecord
+            | undefined;
+
+          // Only a record whose identity the node never acknowledged may be
+          // replaced: once the node accepted its genesis, registering again
+          // would post a second genesis for a live identity.
+          if (
+            existing &&
+            (existing.version !== 2 ||
+              existing.firstKeychainPublish !== 'unacknowledged')
+          ) {
+            transaction.abort();
+            reject(new Error('Vault record already exists.'));
+
+            return;
+          }
+
+          store.put(record);
+        });
+        transaction.addEventListener('complete', () => resolve());
+        transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
+      });
+    } finally {
+      database.close();
+    }
   }
 
   public async replaceProtection(
@@ -243,6 +324,9 @@ export class IndexedDbDeviceIdentityVaultStore implements VaultStore {
         });
         transaction.addEventListener('complete', () => resolve());
         transaction.addEventListener('error', () => reject(transaction.error));
+        transaction.addEventListener('abort', () =>
+          reject(aborted(transaction)),
+        );
       });
     } finally {
       database.close();

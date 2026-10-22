@@ -14,9 +14,15 @@ export type DeviceIdentityVaultRecord = {
 };
 
 /**
- * First keychain publish of an identity created on this device. `armed` lets
- * its first keychain post without a head. `ambiguous` means a post may have
- * been accepted without an answer, so no head-less post is made until a head
- * is adopted. An absent field reads as `none`.
+ * First keychain publish of an identity created on this device.
+ * `unacknowledged` means the node has not yet accepted the identity's
+ * genesis, so creation may still be retried and no keychain is posted.
+ * `armed` lets its first keychain post without a head. `ambiguous` means a
+ * post may have been accepted without an answer, so no head-less post is made
+ * until a head is adopted. An absent field reads as `none`.
  */
-export type FirstKeychainPublishState = 'none' | 'armed' | 'ambiguous';
+export type FirstKeychainPublishState =
+  | 'none'
+  | 'unacknowledged'
+  | 'armed'
+  | 'ambiguous';

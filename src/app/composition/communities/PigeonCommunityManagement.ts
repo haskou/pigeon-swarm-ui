@@ -210,9 +210,13 @@ export class PigeonCommunityManagement {
     return this.channelResource(channel);
   }
 
-  public async search(session: Session): Promise<Community[]> {
+  public async search(
+    session: Session,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<Community[]> {
     const communities = await this.useCases.searcher.search(
       new SearchCommunitiesMessage(this.actor(session)),
+      options,
     );
 
     return communities.map((community) => this.mapper.toResource(community));

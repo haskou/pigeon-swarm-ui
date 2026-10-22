@@ -70,7 +70,10 @@ export interface CommunityRepository {
     channel: CommunityChannel,
     actorIdentityId: CommunityIdentityId,
   ): Promise<CommunityChannel>;
-  search(actorIdentityId: CommunityIdentityId): Promise<Community[]>;
+  search(
+    actorIdentityId: CommunityIdentityId,
+    options?: { signal?: AbortSignal },
+  ): Promise<Community[]>;
   unbanMember(
     community: Community,
     memberIdentityId: CommunityIdentityId,

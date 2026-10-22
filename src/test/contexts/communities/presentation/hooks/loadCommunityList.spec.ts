@@ -1,9 +1,11 @@
 import {
+  forgetCommunitiesSeen,
   hasSeenCommunities,
   rememberCommunitiesSeen,
 } from '../../../../../contexts/communities/infrastructure/storage/communitiesSeen';
 import { CommunityListLoads } from '../../../../../contexts/communities/presentation/hooks/CommunityListLoads';
 import { loadCommunityList } from '../../../../../contexts/communities/presentation/hooks/loadCommunityList';
+import { HttpJsonError } from '../../../../../shared/infrastructure/http/HttpJsonError';
 
 const community = { id: 'community-1' } as never;
 
@@ -22,9 +24,15 @@ function deferred<T>(): {
 function sinks(): {
   onFailed: jest.Mock;
   onSettled: jest.Mock;
+  onUnsettled: jest.Mock;
   onWaiting: jest.Mock;
 } {
-  return { onFailed: jest.fn(), onSettled: jest.fn(), onWaiting: jest.fn() };
+  return {
+    onFailed: jest.fn(),
+    onSettled: jest.fn(),
+    onUnsettled: jest.fn(),
+    onWaiting: jest.fn(),
+  };
 }
 
 describe('loadCommunityList', () => {
@@ -153,9 +161,75 @@ describe('loadCommunityList', () => {
     expect(reads[0]).toHaveBeenCalledTimes(1);
     expect(reads[1]).toHaveBeenCalledTimes(1);
     expect(reads[2]).toHaveBeenCalledTimes(3);
-    expect(outs[0].onFailed).not.toHaveBeenCalled();
-    expect(outs[1].onFailed).not.toHaveBeenCalled();
-    expect(outs[2].onFailed).toHaveBeenCalledTimes(1);
+    expect(outs[0].onUnsettled).not.toHaveBeenCalled();
+    expect(outs[1].onUnsettled).not.toHaveBeenCalled();
+    expect(outs[2].onUnsettled).toHaveBeenCalledTimes(1);
+    expect(outs[2].onFailed).not.toHaveBeenCalled();
+  });
+
+  it('offers to go on without communities when the node keeps answering an empty list, and keeps the flag', async () => {
+    const loads = new CommunityListLoads();
+    const out = sinks();
+
+    rememberCommunitiesSeen('identity-a');
+
+    await loadCommunityList({
+      ...out,
+      delaysMs: [1, 1],
+      load: loads.begin('identity-a'),
+      read: jest.fn().mockResolvedValue([]),
+    });
+
+    expect(out.onUnsettled).toHaveBeenCalledTimes(1);
+    expect(out.onFailed).not.toHaveBeenCalled();
+    expect(out.onSettled).not.toHaveBeenCalled();
+    expect(hasSeenCommunities('identity-a')).toBe(true);
+  });
+
+  it('never offers to go on without communities when the node is not ready', async () => {
+    const loads = new CommunityListLoads();
+    const out = sinks();
+
+    rememberCommunitiesSeen('identity-a');
+
+    await loadCommunityList({
+      ...out,
+      delaysMs: [1],
+      load: loads.begin('identity-a'),
+      read: jest
+        .fn()
+        .mockRejectedValue(
+          new HttpJsonError(
+            503,
+            'Service Unavailable',
+            JSON.stringify({ code: 503020 }),
+          ),
+        ),
+    });
+
+    expect(out.onFailed).toHaveBeenCalledWith(expect.any(HttpJsonError));
+    expect(out.onUnsettled).not.toHaveBeenCalled();
+    expect(hasSeenCommunities('identity-a')).toBe(true);
+  });
+
+  it('settles an empty list with one read once the user went on without communities', async () => {
+    const loads = new CommunityListLoads();
+    const out = sinks();
+    const read = jest.fn().mockResolvedValue([]);
+
+    rememberCommunitiesSeen('identity-a');
+    forgetCommunitiesSeen('identity-a');
+
+    await loadCommunityList({
+      ...out,
+      delaysMs: [1, 1],
+      load: loads.begin('identity-a'),
+      read,
+    });
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(out.onSettled).toHaveBeenCalledWith([]);
+    expect(out.onUnsettled).not.toHaveBeenCalled();
   });
 
   it('reports a failed load only while it is the current one', async () => {

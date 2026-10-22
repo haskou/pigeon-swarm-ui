@@ -42,6 +42,7 @@ const runs = [
       'e2e/recovery-key-keychain.spec.ts',
       'e2e/contact-presence.spec.ts',
       'e2e/community-list-after-restart.spec.ts',
+      'e2e/community-list-deleted-elsewhere.spec.ts',
       'e2e/empty-members-column.spec.ts',
     ],
     projects: ['desktop-chromium'],

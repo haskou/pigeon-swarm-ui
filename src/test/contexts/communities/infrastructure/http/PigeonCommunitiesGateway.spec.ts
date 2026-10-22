@@ -66,13 +66,16 @@ function gatewayDouble(): {
 }
 
 describe(PigeonCommunitiesGateway.name, () => {
-  it('adapts community listing to the application-facing name', async () => {
+  it('adapts community listing to the application-facing name, passing the abort signal on', async () => {
     const { communities, gateway } = gatewayDouble();
     const result = [community()];
+    const { signal } = new AbortController();
     communities.list.mockResolvedValue(result);
 
-    await expect(gateway.listCommunities(session())).resolves.toBe(result);
-    expect(communities.list).toHaveBeenCalledWith(session());
+    await expect(gateway.listCommunities(session(), { signal })).resolves.toBe(
+      result,
+    );
+    expect(communities.list).toHaveBeenCalledWith(session(), { signal });
   });
 
   it('invalidates membership-request reads after creating a request', async () => {

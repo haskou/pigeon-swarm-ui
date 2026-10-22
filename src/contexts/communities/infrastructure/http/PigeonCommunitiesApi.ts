@@ -32,7 +32,10 @@ import type { CommunityVoiceChannelResource as CommunityVoiceChannel } from './r
 import { PublicMutationSigner } from '../../../../shared/infrastructure/crypto/PublicMutationSigner';
 import { pagedPath } from '../../../../shared/infrastructure/http/pagedPath';
 import { readAllPages } from '../../../../shared/infrastructure/http/readAllPages';
-import { retryReplicatedStateRead } from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
+import {
+  isNodeStarting,
+  retryReplicatedStateRead,
+} from '../../../../shared/infrastructure/http/retryReplicatedStateRead';
 import { ScopeFrontierReader } from '../../../../shared/infrastructure/http/ScopeFrontierReader';
 import { submitPublicMutation } from '../../../../shared/infrastructure/http/submitPublicMutation';
 import { DraftPayloadCipher } from '../../../messages/infrastructure/crypto/DraftPayloadCipher';
@@ -521,19 +524,28 @@ export class PigeonCommunitiesApi {
     return await this.readFrontier(session, communityId);
   }
 
-  public async list(session: Session): Promise<Community[]> {
+  /**
+   * Each caller retries on its own schedule, and every attempt joins the GET
+   * other callers have in flight, so a caller that aborts stops its own
+   * retries without cutting the read another caller still waits for.
+   */
+  public async list(
+    session: Session,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<Community[]> {
     const path = '/communities';
-    const result = await this.cachedRequest(
-      `GET ${path} ${session.identity.id}`,
+    const result = await retryReplicatedStateRead(
       async () =>
-        await retryReplicatedStateRead(
+        await this.cachedRequest(
+          `GET ${path} ${session.identity.id}`,
           async () =>
             await this.http.request<{ communities: Community[] }>(path, {
               headers: await this.signer.headers(session, 'GET', path),
               method: 'GET',
             }),
+          { ttlMs: startupReadCacheTtlMs },
         ),
-      { ttlMs: startupReadCacheTtlMs },
+      { isRetriable: isNodeStarting, signal: options.signal },
     );
 
     return result.communities;

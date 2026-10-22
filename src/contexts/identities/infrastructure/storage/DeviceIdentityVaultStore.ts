@@ -19,12 +19,14 @@ export interface DeviceIdentityVaultStore {
     revision: DeviceAuthorizationRevision,
   ): Promise<void>;
   delete(identityId: IdentityId): Promise<void>;
-  setFirstKeychainPublish(
+  clearFirstKeychainPublish(identityId: IdentityId): Promise<void>;
+  transitionFirstKeychainPublish(
     identityId: IdentityId,
-    state: FirstKeychainPublishState,
-  ): Promise<void>;
+    from: FirstKeychainPublishState,
+    to: FirstKeychainPublishState,
+  ): Promise<boolean>;
   find(identityId: IdentityId): Promise<DeviceIdentityVaultRecord | undefined>;
-  insert(record: DeviceIdentityVaultRecord): Promise<void>;
+  arm(record: DeviceIdentityVaultRecord): Promise<void>;
   save(record: DeviceIdentityVaultRecord): Promise<void>;
   replaceProtection(
     expected: DeviceIdentityVaultRecord,
