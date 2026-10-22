@@ -79,6 +79,10 @@ test('a device whose communities were all left on another device continues witho
 
     // The phone, the same identity paired as another device, leaves the
     // community. A recovery-key sign-in would remove the laptop instead.
+    // Pairing starts from the messages workspace, where the profile opens.
+    await laptop
+      .getByRole('button', { name: 'Open messages workspace' })
+      .click();
     await pairNewDevice(laptop, phone, member);
     const phoneCommunity = phone
       .getByRole('button', { name: communityName })
