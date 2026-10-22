@@ -3,7 +3,7 @@ import type { PublicMutation } from '@haskou/pigeon-swarm-crypto';
 import type { HttpJsonClient } from '../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../shared/infrastructure/http/RequestSigner';
 import type { Session } from '../../../identities/infrastructure/session/Session';
-import type { CallSignalPayload } from '../media/CallSignalPayload';
+import type { SealedCallSignal } from '../signals/SealedCallSignal';
 import type { CallParticipantState } from './CallEventSigner';
 import type { CallScopeLookup } from './CallScopeLookup';
 import type { CallIceServerResource as CallIceServerConfig } from './resources/CallIceServerResource';
@@ -326,7 +326,7 @@ export class PigeonCallsApi {
   public async sendSignal(
     session: Session,
     callId: string,
-    signal: CallSignalPayload,
+    signal: SealedCallSignal,
   ): Promise<CallSignalDelivery> {
     const path = `/calls/${encodeURIComponent(callId)}/signals`;
     const requestBody = new CallSignalRequestBody(signal);

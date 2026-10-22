@@ -1,16 +1,12 @@
-import type { CallSignalPayload } from '../media/CallSignalPayload';
+import type { SealedCallSignal } from '../signals/SealedCallSignal';
 
 const maximumCallSignalBytes = 64 * 1024;
 
 export class CallSignalRequestBody {
   private readonly serialized: string;
 
-  public constructor(signal: CallSignalPayload) {
-    this.serialized = JSON.stringify({
-      payload: signal.payload,
-      recipientIdentityId: signal.recipientIdentityId,
-      signalType: signal.signalType,
-    });
+  public constructor(private readonly signal: SealedCallSignal) {
+    this.serialized = JSON.stringify(signal);
 
     if (
       new TextEncoder().encode(this.serialized).byteLength >=
@@ -22,16 +18,8 @@ export class CallSignalRequestBody {
     }
   }
 
-  public body(): {
-    payload: Record<string, unknown>;
-    recipientIdentityId: string;
-    signalType: CallSignalPayload['signalType'];
-  } {
-    return JSON.parse(this.serialized) as {
-      payload: Record<string, unknown>;
-      recipientIdentityId: string;
-      signalType: CallSignalPayload['signalType'];
-    };
+  public body(): SealedCallSignal {
+    return JSON.parse(this.serialized) as SealedCallSignal;
   }
 
   public toString(): string {

@@ -2,8 +2,8 @@ import type { CallParticipantMediaConnectionResource as CallParticipantMediaConn
 import type { CallResource } from '../../infrastructure/http/resources/CallResource';
 import type { CallMediaKey } from '../../infrastructure/media/CallMediaKey';
 import type { ScreenShareQualityPreset } from '../../infrastructure/media/ScreenShareQualityPreset';
+import type { SealedCallSignal } from '../../infrastructure/signals/SealedCallSignal';
 import type { CallSession } from '../view-models/CallSession';
-import type { ReceivedCallSignal as ReceivedSignal } from './CallSignalDispatcher';
 import type { ReconcileCallInput } from './ReconcileCallInput';
 import type { StartCallInput } from './StartCallInput';
 
@@ -11,7 +11,7 @@ export type CallSessionControls = {
   activeCall: CallSession | null;
   callMediaConnections: () => CallParticipantMediaConnection[];
   endCall: () => void;
-  receiveSignal: (input: ReceivedSignal) => Promise<void>;
+  receiveSignal: (signal: SealedCallSignal) => Promise<void>;
   reconcileCall: (call: CallResource, input: ReconcileCallInput) => void;
   /** Gives the active call `callId` a newer epoch's media key. */
   rekeyMediaEncryption: (callId: string, key: CallMediaKey) => void;

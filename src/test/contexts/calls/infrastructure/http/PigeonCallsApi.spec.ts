@@ -1,3 +1,4 @@
+import type { SealedCallSignal } from '../../../../../contexts/calls/infrastructure/signals/SealedCallSignal';
 import type { Session } from '../../../../../contexts/identities/infrastructure/session/Session';
 import type { HttpJsonClient } from '../../../../../shared/infrastructure/http/HttpJsonClient';
 import type { RequestSigner } from '../../../../../shared/infrastructure/http/RequestSigner';
@@ -268,10 +269,8 @@ describe(PigeonCallsApi.name, () => {
     );
     const result = expect(
       api.sendSignal(session, 'call-a', {
-        payload: { sdp: 'offer-sdp', type: 'offer' },
-        recipientIdentityId: 'identity-b',
-        signalType: 'offer',
-      }),
+        signalId: 'signal-a',
+      } as SealedCallSignal),
     ).rejects.toMatchObject({ name: 'TimeoutError' });
 
     await jest.advanceTimersByTimeAsync(4_999);

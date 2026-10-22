@@ -25,6 +25,9 @@ import { MessageAttachmentThumbnailPreparer } from '../../contexts/attachments/i
 import { PublicImageUploadPreparer } from '../../contexts/attachments/infrastructure/media/PublicImageUploadPreparer';
 import { CallEventSigner } from '../../contexts/calls/infrastructure/http/CallEventSigner';
 import { PigeonCallsApi } from '../../contexts/calls/infrastructure/http/PigeonCallsApi';
+import { CallSignalReplicaLogs } from '../../contexts/calls/infrastructure/signals/CallSignalReplicaLogs';
+import { PigeonCallSealingApi } from '../../contexts/calls/infrastructure/signals/PigeonCallSealingApi';
+import { PigeonCallSignalGenesisReader } from '../../contexts/calls/infrastructure/signals/PigeonCallSignalGenesisReader';
 import { PigeonCommunitiesApi } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesApi';
 import { PigeonCommunitiesGateway } from '../../contexts/communities/infrastructure/http/PigeonCommunitiesGateway';
 import { PigeonCommunityInvitationApi } from '../../contexts/communities/infrastructure/http/PigeonCommunityInvitationApi';
@@ -99,6 +102,12 @@ export class PigeonApiGateway {
   private readonly attachmentCipher: AttachmentCipher;
 
   public readonly calls: PigeonCallsApi;
+
+  public readonly callSealing: PigeonCallSealingApi;
+
+  public readonly callSignalGenesis: PigeonCallSignalGenesisReader;
+
+  public readonly callSignalReplicas: CallSignalReplicaLogs;
 
   public readonly communityGateway: PigeonCommunitiesGateway;
 
@@ -252,6 +261,20 @@ export class PigeonApiGateway {
         identityId,
         await identityResourceGateway.get(identityId),
       );
+    this.callSealing = new PigeonCallSealingApi(http, signer);
+    this.callSignalGenesis = new PigeonCallSignalGenesisReader(
+      identityResourceGateway,
+    );
+    this.callSignalReplicas = new CallSignalReplicaLogs(
+      this.callSealing,
+      ownHome,
+      verifiedRecipientBase,
+      (origin) =>
+        new PigeonCallSealingApi(
+          new HttpJsonClient(new ApiUrlBuilder(origin), { isolated: true }),
+          new RequestSigner(undefined, ApiUrlBuilder.pathPrefix(origin)),
+        ),
+    );
     const privateBlobs = new PigeonPrivateBlobClient(http, signer, {
       client: (origin) =>
         new HttpJsonClient(new ApiUrlBuilder(origin), { isolated: true }),
