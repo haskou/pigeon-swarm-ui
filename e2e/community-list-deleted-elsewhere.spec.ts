@@ -1,15 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   claimInviteLink,
   createInviteLink,
 } from './support/communityInvitations';
 import {
-  loginIdentity,
   newIsolatedPage,
   openSidebar,
   pairNewDevice,
   registerIdentity,
+  waitForSettledLoginScreen,
 } from './support/pigeonApp';
 
 const ENCRYPTED = /encryption is active/;
@@ -109,7 +109,7 @@ test('a device whose communities were all left on another device continues witho
     // The node settles an empty list for the laptop, which the laptop cannot
     // tell from a node still opening its state: it reports the list as not
     // settled, never as empty, and offers to continue without communities.
-    await loginIdentity(laptop, `@${memberHandle}`, password);
+    await signInToCommunityWorkspace(laptop, memberHandle, password);
     await laptop
       .getByText(NOT_SETTLED)
       .filter({ visible: true })
@@ -130,7 +130,7 @@ test('a device whose communities were all left on another device continues witho
     await expect(laptop.getByText(NOT_SETTLED)).toHaveCount(0);
 
     // The choice holds: the next sign-in settles the empty list at once.
-    await loginIdentity(laptop, `@${memberHandle}`, password);
+    await signInToCommunityWorkspace(laptop, memberHandle, password);
     await laptop
       .getByText(EMPTY_LIST)
       .filter({ visible: true })
@@ -143,3 +143,19 @@ test('a device whose communities were all left on another device continues witho
     );
   }
 });
+
+/**
+ * Signs the remembered identity in again. It reopens the community workspace,
+ * which has no conversation list for `loginIdentity` to wait for.
+ */
+async function signInToCommunityWorkspace(
+  page: Page,
+  handle: string,
+  password: string,
+): Promise<void> {
+  await page.goto('/');
+  await waitForSettledLoginScreen(page);
+  await expect(page.getByTestId('auth-identity-preview')).toContainText(handle);
+  await page.getByTestId('auth-password-input').fill(password);
+  await page.getByTestId('auth-submit-button').click();
+}
